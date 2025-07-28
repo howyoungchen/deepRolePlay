@@ -61,6 +61,7 @@ class RequestLogger:
         request_body: Dict[str, Any],
         status_code: int,
         chunks_count: int,
+        final_response: Dict[str, Any],
         duration: float,
         request_id: str = None
     ):
@@ -81,9 +82,10 @@ class RequestLogger:
             },
             "response": {
                 "status_code": status_code,
-                "headers": {"content-type": "text/event-stream"},
-                "body": f"<streaming_response_with_{chunks_count}_chunks>",
-                "is_streaming": True
+                "headers": {"content-type": "application/json"},
+                "body": final_response,
+                "is_streaming": True,
+                "chunks_count": chunks_count
             },
             "duration_seconds": duration
         }

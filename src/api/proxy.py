@@ -1,3 +1,4 @@
+import json
 import time
 import uuid
 import httpx
@@ -149,6 +150,54 @@ class ProxyService:
         
         return response
     
+    def _parse_streaming_response(self, raw_chunks: List[str]) -> Dict[str, Any]:
+        """解析流式响应，提取最终结果"""
+        content_parts = []
+        reasoning_parts = []
+        final_data = None
+        
+        for chunk in raw_chunks:
+            lines = chunk.strip().split('\n')
+            for line in lines:
+                if line.startswith('data: '):
+                    data_str = line[6:]  # 去掉 'data: ' 前缀
+                    if data_str == '[DONE]':
+                        continue
+                    try:
+                        data = json.loads(data_str)
+                        if 'choices' in data and len(data['choices']) > 0:
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta and delta['content']:
+                                content_parts.append(delta['content'])
+                            if 'reasoning_content' in delta and delta['reasoning_content']:
+                                reasoning_parts.append(delta['reasoning_content'])
+                            final_data = data  # 保存最后一个有效的数据结构
+                    except json.JSONDecodeError:
+                        continue
+        
+        # 构造最终响应
+        final_response = {
+            "id": final_data.get('id', '') if final_data else '',
+            "object": "chat.completion",
+            "created": final_data.get('created', 0) if final_data else 0,
+            "model": final_data.get('model', '') if final_data else '',
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "".join(content_parts)
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {"prompt_tokens": 0, "completion_tokens": len(content_parts), "total_tokens": len(content_parts)}
+        }
+        
+        # 如果有推理内容，添加到响应中
+        if reasoning_parts:
+            final_response["reasoning_content"] = "".join(reasoning_parts)
+        
+        return final_response
+
     async def _handle_streaming_request(
         self,
         request: Request,
@@ -158,20 +207,25 @@ class ProxyService:
     ):
         """处理流式请求"""
         chunks_count = 0
+        collected_chunks = []
         
         async def stream_generator():
-            nonlocal chunks_count
+            nonlocal chunks_count, collected_chunks
             try:
                 async for chunk in self._forward_streaming(request_data):
                     chunks_count += 1
+                    collected_chunks.append(chunk)
                     yield chunk
             finally:
                 duration = time.time() - start_time
+                # 解析流式响应得到最终结果
+                final_response = self._parse_streaming_response(collected_chunks)
                 await request_logger.log_streaming_request(
                     request=request,
                     request_body=request_data,
                     status_code=200,
                     chunks_count=chunks_count,
+                    final_response=final_response,
                     duration=duration,
                     request_id=request_id
                 )
