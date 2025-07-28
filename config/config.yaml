@@ -1,0 +1,18 @@
+# AI角色扮演代理系统配置文件
+
+# API代理相关配置
+proxy:
+  target_url: "https://api.deepseek.com/v1"
+  api_key: "sk-5b155b212651493b942e7dca7dfb4751"
+  timeout: 30
+
+# 系统配置
+system:
+  log_level: "INFO"
+  log_dir: "./logs"
+  
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 6666
+  reload: false
