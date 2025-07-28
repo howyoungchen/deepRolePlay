@@ -185,8 +185,6 @@ project/
 │   ├── message.py         # 消息处理工具函数
 │   └── logger.py          # 项目日志保存逻辑
 ├── scenarios/             # 情景文件目录
-│   ├── current_scenario.json
-│   └── history/          # 历史情景备份
 ├── logs/                  # 日志目录
 └── tests/                 # 测试文件
 ```
