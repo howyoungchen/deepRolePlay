@@ -23,6 +23,16 @@ class ServerConfig(BaseModel):
     reload: bool = False
 
 
+class ScenarioConfig(BaseModel):
+    file_path: str = "./scenarios/current_scenario.txt"
+    update_enabled: bool = True
+
+
+class LangGraphConfig(BaseModel):
+    model: str = "deepseek-chat"
+    max_history_length: int = 20
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -34,6 +44,8 @@ class Settings(BaseSettings):
     proxy: ProxyConfig = ProxyConfig()
     system: SystemConfig = SystemConfig()
     server: ServerConfig = ServerConfig()
+    scenario: ScenarioConfig = ScenarioConfig()
+    langgraph: LangGraphConfig = LangGraphConfig()
     
     @classmethod
     def load_from_yaml(cls, yaml_path: str = "config/config.yaml") -> "Settings":

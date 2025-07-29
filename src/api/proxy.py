@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional, AsyncGenerator
 
 from config.manager import settings
 from utils.logger import request_logger
+from utils.message import inject_scenario
+from src.scenario.manager import scenario_manager
 
 
 class ChatMessage(BaseModel):
@@ -86,7 +88,19 @@ class ProxyService:
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
+        # 1. 获取当前情景
+        current_scenario = await scenario_manager.get_current_scenario()
+        
+        # 2. 将情景注入到消息中
+        original_messages = [msg.model_dump() for msg in chat_request.messages]
+        injected_messages = inject_scenario(original_messages, current_scenario)
+        
+        # 3. 异步提交请求副本给情景管理器（后台处理）
+        await scenario_manager.submit_request(original_messages)
+        
+        # 4. 创建注入情景后的请求数据
         request_data = chat_request.model_dump(exclude_none=True)
+        request_data["messages"] = injected_messages
         
         try:
             if chat_request.stream:

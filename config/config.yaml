@@ -6,6 +6,16 @@ proxy:
   api_key: "sk-5b155b212651493b942e7dca7dfb4751"
   timeout: 30
 
+# 情景管理相关配置
+scenario:
+  file_path: "./scenarios/current_scenario.txt"
+  update_enabled: true
+
+# LangGraph工作流配置
+langgraph:
+  model: "deepseek-chat"
+  max_history_length: 20
+
 # 系统配置
 system:
   log_level: "INFO"
