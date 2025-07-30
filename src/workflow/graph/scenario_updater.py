@@ -93,12 +93,8 @@ class ScenarioUpdaterAgent:
             
             await request_logger.log_info(f"开始生成情景，历史消息数量: {len(history)}")
             
-            # 在后台线程中运行同步的agent
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, 
-                self._run_agent_sync, 
-                user_message
-            )
+            # 直接异步调用agent
+            response = await self._run_agent_async(user_message)
             
             # 记录工作流执行日志
             log_workflow_execution("scenario_updater", response)
@@ -119,9 +115,9 @@ class ScenarioUpdaterAgent:
             # 返回基于历史的简单摘要作为降级方案
             return self._create_fallback_scenario(history)
     
-    def _run_agent_sync(self, user_message: str) -> Dict[str, Any]:
+    async def _run_agent_async(self, user_message: str) -> Dict[str, Any]:
         """
-        在同步环境中运行agent
+        异步运行agent
         
         Args:
             user_message: 用户消息
@@ -129,7 +125,7 @@ class ScenarioUpdaterAgent:
         Returns:
             agent响应
         """
-        return self.agent.invoke({
+        return await self.agent.ainvoke({
             "messages": [{"role": "user", "content": user_message}]
         })
     
