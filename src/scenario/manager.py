@@ -5,7 +5,7 @@
 import os
 import asyncio
 import aiofiles
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
 
 from config.manager import settings
@@ -27,9 +27,6 @@ class ScenarioManager:
         # 确保scenarios目录存在
         os.makedirs(os.path.dirname(self.scenario_file_path), exist_ok=True)
         
-        # 情景缓存
-        self._scenario_cache: Optional[str] = None
-        self._cache_updated_at: Optional[datetime] = None
         
         # 获取最大历史长度配置
         if hasattr(settings, 'langgraph') and hasattr(settings.langgraph, 'max_history_length'):
@@ -45,28 +42,18 @@ class ScenarioManager:
             当前情景内容字符串
         """
         try:
-            # 如果缓存存在且文件未修改，直接返回缓存
-            if self._scenario_cache and self._is_cache_valid():
-                return self._scenario_cache
-            
             # 检查文件是否存在
             if not os.path.exists(self.scenario_file_path):
                 # 如果文件不存在，创建默认情景
                 default_scenario = "这是一个全新的对话开始。"
                 await self._save_scenario_to_file(default_scenario)
-                self._scenario_cache = default_scenario
-                self._cache_updated_at = datetime.now()
                 return default_scenario
             
-            # 异步读取文件
+            # 直接读取文件
             async with aiofiles.open(self.scenario_file_path, 'r', encoding='utf-8') as f:
                 content = await f.read()
             
-            # 更新缓存
-            self._scenario_cache = content.strip()
-            self._cache_updated_at = datetime.now()
-            
-            return self._scenario_cache
+            return content.strip()
             
         except Exception as e:
             await request_logger.log_error(f"获取情景文件失败: {str(e)}")
@@ -115,10 +102,6 @@ class ScenarioManager:
                 # 保存新情景到文件
                 await self._save_scenario_to_file(new_scenario)
                 
-                # 更新缓存
-                self._scenario_cache = new_scenario
-                self._cache_updated_at = datetime.now()
-                
                 await request_logger.log_info(f"情景更新成功，新情景长度: {len(new_scenario)}")
             else:
                 await request_logger.log_warning("工作流未生成有效的情景内容")
@@ -155,22 +138,6 @@ class ScenarioManager:
             await request_logger.log_error(f"保存情景文件失败: {str(e)}")
             raise
     
-    def _is_cache_valid(self) -> bool:
-        """
-        检查缓存是否有效
-        
-        Returns:
-            缓存是否有效
-        """
-        if not self._cache_updated_at:
-            return False
-        
-        try:
-            # 检查文件修改时间
-            file_mtime = datetime.fromtimestamp(os.path.getmtime(self.scenario_file_path))
-            return file_mtime <= self._cache_updated_at
-        except (OSError, FileNotFoundError):
-            return False
     
     async def get_scenario_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
@@ -246,10 +213,6 @@ class ScenarioManager:
                 raise ValueError("情景内容不能为空")
             
             await self._save_scenario_to_file(new_scenario.strip())
-            
-            # 更新缓存
-            self._scenario_cache = new_scenario.strip()
-            self._cache_updated_at = datetime.now()
             
             await request_logger.log_info(f"手动更新情景成功，新情景长度: {len(new_scenario)}")
             return True

@@ -95,10 +95,7 @@ class ProxyService:
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         injected_messages = inject_scenario(original_messages, current_scenario)
         
-        # 3. 异步提交请求副本给情景管理器（后台处理）
-        await scenario_manager.submit_request(original_messages)
-        
-        # 4. 创建注入情景后的请求数据
+        # 3. 创建注入情景后的请求数据
         request_data = chat_request.model_dump(exclude_none=True)
         request_data["messages"] = injected_messages
         
