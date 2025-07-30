@@ -40,7 +40,11 @@ SYSTEM_PROMPT = """
 - 始终使用中文与用户交流
 - 操作完成后简要说明结果
 
-请根据用户请求智能选择合适的工具组合并按逻辑顺序执行。
+请根据用户请求智能选择合适的工具组合并按逻辑顺序执行。\n
+"""
+
+USER_PROMPT = """
+\n上面是需要处理的任务记录，请根据记录内容选择合适的工具来完成任务。\n
 """
 
 # 工具列表
@@ -89,8 +93,9 @@ class ReactAgent:
             包含messages的响应字典
         """
         try:
+            combined_message = message + USER_PROMPT
             response = self.agent.invoke({
-                "messages": [{"role": "user", "content": message}]
+                "messages": [{"role": "user", "content": combined_message}]
             })
             return response
         except Exception as e:
@@ -107,8 +112,9 @@ class ReactAgent:
             流式响应数据块
         """
         try:
+            combined_message = message + USER_PROMPT
             for chunk in self.agent.stream({
-                "messages": [{"role": "user", "content": message}]
+                "messages": [{"role": "user", "content": combined_message}]
             }):
                 yield chunk
         except Exception as e:
