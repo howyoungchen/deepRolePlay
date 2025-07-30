@@ -60,6 +60,19 @@ class ScenarioManager:
             # 返回默认情景
             return "这是一个全新的对话开始。"
     
+    async def update_scenario(self, messages: List[Dict[str, Any]]) -> None:
+        """
+        同步更新情景，等待完成
+        
+        Args:
+            messages: 原始消息列表
+        """
+        try:
+            # 直接调用工作流更新逻辑，使用 await 同步等待
+            await self._update_scenario_workflow(messages)
+        except Exception as e:
+            await request_logger.log_error(f"同步情景更新失败: {str(e)}")
+    
     async def submit_request(self, messages: List[Dict[str, Any]]) -> None:
         """
         提交请求副本，异步启动情景更新工作流
@@ -81,12 +94,12 @@ class ScenarioManager:
         except Exception as e:
             await request_logger.log_error(f"提交情景更新请求失败: {str(e)}")
     
-    async def _update_scenario_workflow(self, history: List[Dict[str, Any]]) -> None:
+    async def _update_scenario_workflow(self, messages: List[Dict[str, Any]]) -> None:
         """
-        运行情景更新工作流（后台任务）
+        运行情景更新工作流
         
         Args:
-            history: 对话历史
+            messages: 原始消息列表
         """
         try:
             # 动态导入以避免循环依赖
@@ -96,7 +109,7 @@ class ScenarioManager:
             updater = ScenarioUpdaterAgent()
             
             # 运行工作流生成新情景
-            new_scenario = await updater.generate_scenario(history)
+            new_scenario = await updater.generate_scenario(messages)
             
             if new_scenario and new_scenario.strip():
                 # 保存新情景到文件

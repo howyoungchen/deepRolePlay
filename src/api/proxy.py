@@ -88,14 +88,19 @@ class ProxyService:
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
-        # 1. 获取当前情景
+        # 1. 提取原始消息
+        original_messages = [msg.model_dump() for msg in chat_request.messages]
+        
+        # 2. 同步更新情景，等待完成
+        await scenario_manager.update_scenario(original_messages)
+        
+        # 3. 获取最新情景
         current_scenario = await scenario_manager.get_current_scenario()
         
-        # 2. 将情景注入到消息中
-        original_messages = [msg.model_dump() for msg in chat_request.messages]
+        # 4. 将情景注入到消息中
         injected_messages = inject_scenario(original_messages, current_scenario)
         
-        # 3. 创建注入情景后的请求数据
+        # 5. 创建注入情景后的请求数据
         request_data = chat_request.model_dump(exclude_none=True)
         request_data["messages"] = injected_messages
         
