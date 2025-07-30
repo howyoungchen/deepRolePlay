@@ -3,14 +3,12 @@
 负责情景文件管理和工作流调度
 """
 import os
-import asyncio
 import aiofiles
 from typing import List, Dict, Any
 from datetime import datetime
 
 from config.manager import settings
 from utils.logger import request_logger
-from utils.message import extract_history
 
 
 class ScenarioManager:
@@ -26,13 +24,6 @@ class ScenarioManager:
         
         # 确保scenarios目录存在
         os.makedirs(os.path.dirname(self.scenario_file_path), exist_ok=True)
-        
-        
-        # 获取最大历史长度配置
-        if hasattr(settings, 'langgraph') and hasattr(settings.langgraph, 'max_history_length'):
-            self.max_history_length = settings.langgraph.max_history_length
-        else:
-            self.max_history_length = 20
     
     async def get_current_scenario(self) -> str:
         """
@@ -72,27 +63,6 @@ class ScenarioManager:
             await self._update_scenario_workflow(messages)
         except Exception as e:
             await request_logger.log_error(f"同步情景更新失败: {str(e)}")
-    
-    async def submit_request(self, messages: List[Dict[str, Any]]) -> None:
-        """
-        提交请求副本，异步启动情景更新工作流
-        
-        Args:
-            messages: 原始消息列表
-        """
-        try:
-            # 提取对话历史
-            history = extract_history(messages, self.max_history_length)
-            
-            if not history:
-                # 没有历史记录，无需更新情景
-                return
-            
-            # 使用asyncio.create_task启动后台任务
-            asyncio.create_task(self._update_scenario_workflow(history))
-            
-        except Exception as e:
-            await request_logger.log_error(f"提交情景更新请求失败: {str(e)}")
     
     async def _update_scenario_workflow(self, messages: List[Dict[str, Any]]) -> None:
         """
