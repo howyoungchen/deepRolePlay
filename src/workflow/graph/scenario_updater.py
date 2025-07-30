@@ -16,6 +16,9 @@ from utils.logger import request_logger
 
 # 导入工具
 from src.workflow.tools.write_tool import write_file
+from src.workflow.tools.read_tool import read_target_file
+from src.workflow.tools.edit_tool import edit_file
+from src.workflow.tools.sequential_thinking import sequential_thinking
 
 
 class ScenarioUpdaterAgent:
@@ -23,18 +26,17 @@ class ScenarioUpdaterAgent:
     
     def __init__(self):
         """初始化ScenarioUpdaterAgent"""
-        # 从配置获取模型配置，如果不存在则使用默认值
-        if hasattr(settings, 'langgraph') and hasattr(settings.langgraph, 'model'):
-            model_name = settings.langgraph.model
-        else:
-            model_name = "deepseek-chat"
+        # 使用agent配置
+        agent_config = settings.agent
         
         # DeepSeek API配置
         self.model = ChatOpenAI(
-            base_url=settings.proxy.target_url,  # 使用现有的API配置
-            model=model_name,
-            api_key=settings.proxy.api_key,
-            temperature=0.1
+            base_url=agent_config.base_url,
+            model=agent_config.model,
+            api_key=agent_config.api_key,
+            temperature=agent_config.temperature,
+            max_tokens=agent_config.max_tokens,
+            top_p=agent_config.top_p
         )
         
         # 系统提示词
@@ -52,16 +54,23 @@ class ScenarioUpdaterAgent:
 
 可用工具：
 - write_file: 将生成的情景内容写入文件
+- read_target_file: 读取文件内容（如需参考现有情景文件）
+- edit_file: 编辑文件的特定部分
+- sequential_thinking: 进行结构化的深度思考分析（复杂情况时使用）
 
-请根据对话历史分析并生成情景文件。
+重要操作规则：
+- 每次使用edit_file工具前，必须先使用read_target_file工具读取文件当前内容
+- 这样可以确保编辑操作基于最新的文件状态，避免内容冲突
+
+请根据对话历史分析并生成情景文件。如果对话历史较复杂，可以先使用sequential_thinking进行深度分析。
 """
         
-        # 创建智能代理，只使用write_file工具
+        # 创建智能代理，使用所有可用工具
         self.agent = create_react_agent(
             model=self.model,
-            tools=[write_file],
+            tools=[write_file, read_target_file, edit_file, sequential_thinking],
             prompt=self.system_prompt,
-            debug=False,
+            debug=agent_config.debug,
         )
         
         print("ScenarioUpdaterAgent 初始化完成!")

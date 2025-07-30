@@ -3,7 +3,7 @@ import yaml
 from pathlib import Path
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 
 class ProxyConfig(BaseModel):
@@ -33,6 +33,27 @@ class LangGraphConfig(BaseModel):
     max_history_length: int = 20
 
 
+class AgentConfig(BaseModel):
+    """代理配置"""
+    # 模型配置
+    model: str = "deepseek-chat"
+    temperature: float = 0.7
+    base_url: str = "https://api.deepseek.com/v1"
+    api_key: str = "sk-your-api-key-here"
+    max_tokens: int = 8192
+    top_p: float = 0.9
+    
+    # 调试和循环控制
+    debug: bool = False
+    max_iterations: int = 25
+    
+    # 超时设置
+    timeout: int = 120
+    
+    # 流式输出
+    stream_mode: str = "values"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -46,6 +67,7 @@ class Settings(BaseSettings):
     server: ServerConfig = ServerConfig()
     scenario: ScenarioConfig = ScenarioConfig()
     langgraph: LangGraphConfig = LangGraphConfig()
+    agent: AgentConfig = AgentConfig()
     
     @classmethod
     def load_from_yaml(cls, yaml_path: str = "config/config.yaml") -> "Settings":

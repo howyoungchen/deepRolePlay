@@ -5,9 +5,15 @@ LangGraph ReAct 单Agent工作流
 """
 
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from typing import Dict, Any, Generator
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+
+# 导入配置管理器
+from config.manager import settings
 
 # 导入现有工具
 from tools.edit_tool import edit_file
@@ -15,14 +21,6 @@ from tools.read_tool import read_target_file
 from tools.write_tool import write_file
 from tools.sequential_thinking import sequential_thinking
 from pretty_print_tool import pretty_print_messages
-
-# DeepSeek API配置（写死）
-DEEPSEEK_CONFIG = {
-    "base_url": "https://api.deepseek.com/v1",
-    "model": "deepseek-chat", 
-    "api_key": "sk-5b155b212651493b942e7dca7dfb4751",
-    "temperature": 0.1
-}
 
 # 自定义系统提示
 SYSTEM_PROMPT = """
@@ -54,12 +52,17 @@ class ReactAgent:
     
     def __init__(self):
         """初始化ReactAgent"""
-        # 初始化DeepSeek模型
+        # 使用agent配置
+        agent_config = settings.agent
+        
+        # 初始化模型
         self.model = ChatOpenAI(
-            base_url=DEEPSEEK_CONFIG["base_url"],
-            model=DEEPSEEK_CONFIG["model"],
-            api_key=DEEPSEEK_CONFIG["api_key"],
-            temperature=DEEPSEEK_CONFIG["temperature"]
+            base_url=agent_config.base_url,
+            model=agent_config.model,
+            api_key=agent_config.api_key,
+            temperature=agent_config.temperature,
+            max_tokens=agent_config.max_tokens,
+            top_p=agent_config.top_p
         )
         
         # 使用create_react_agent创建智能代理
@@ -67,12 +70,14 @@ class ReactAgent:
             model=self.model,
             tools=tools,
             prompt=SYSTEM_PROMPT,
-            debug=False,
+            debug=agent_config.debug,
         )
         
         print("ReactAgent 初始化完成!")
-        print(f"模型: {DEEPSEEK_CONFIG['model']}")
+        print(f"模型: {agent_config.model}")
         print(f"工具数量: {len(tools)}")
+        print(f"调试模式: {agent_config.debug}")
+        print(f"温度: {agent_config.temperature}")
     
     def run(self, message: str) -> Dict[str, Any]:
         """执行单轮对话
