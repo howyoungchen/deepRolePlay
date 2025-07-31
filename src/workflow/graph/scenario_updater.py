@@ -11,7 +11,7 @@ from langgraph.prebuilt import create_react_agent
 
 from config.manager import settings
 from utils.pretty_print import log_workflow_execution
-from utils.message import create_scenario_summary_request
+from utils.message import format_history_for_analysis
 from utils.logger import request_logger
 
 # 导入工具
@@ -75,6 +75,48 @@ class ScenarioUpdaterAgent:
         
         print("ScenarioUpdaterAgent 初始化完成!")
     
+    def build_user_prompt(self, history: List[Dict[str, Any]]) -> str:
+        """
+        构建完整的用户提示词
+        
+        Args:
+            history: 对话历史
+            
+        Returns:
+            完整的用户提示词
+        """
+        # 获取情景文件的绝对路径
+        from src.scenario.manager import scenario_manager
+        scenario_file_path = os.path.abspath(scenario_manager.scenario_file_path)
+        
+        # 格式化对话历史
+        history_text = format_history_for_analysis(history)
+        
+        # 构造完整的用户提示词
+        user_prompt = f"""请根据当前对话历史，更新情景文件。
+
+对话历史：
+{history_text}
+
+情景文件位置：{scenario_file_path}
+
+任务要求：
+1. 首先读取现有情景文件内容，了解当前情景状态
+2. 根据情景文件状态选择操作方式：
+   - 如果文件为空或不存在：使用write_file工具创建新的情景内容
+   - 如果文件有内容：使用edit_file工具修改需要更新的具体部分
+3. 分析当前对话历史，更新以下信息：
+   - 对话的主要角色和身份设定
+   - 当前的情境和背景
+   - 重要的情节发展
+   - 需要记住的关键信息
+4. 完成更新后，读取情景文件并返回完整内容
+
+注意：如果现有情景文件有内容，请保持其结构和有用信息，只修改需要更新的部分。
+如果是空文件，请生成简洁明了的情景内容，文本长度控制在200-500字之间。"""
+        
+        return user_prompt
+
     async def generate_scenario(self, history: List[Dict[str, Any]]) -> str:
         """
         生成情景文件
@@ -86,19 +128,12 @@ class ScenarioUpdaterAgent:
             生成的情景内容
         """
         try:
-            # 生成时间戳用于文件名
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            scenario_file_path = os.path.abspath(f"./scenarios/scenario_{timestamp}.txt")
+            # 获取当前情景文件路径，直接更新这个文件
+            from src.scenario.manager import scenario_manager
+            scenario_file_path = os.path.abspath(scenario_manager.scenario_file_path)
             
-            # 创建摘要请求
-            summary_request = create_scenario_summary_request(history)
-            
-            # 构造完整的用户消息
-            user_message = f"""{summary_request}
-
-请将生成的情景内容保存到文件: {scenario_file_path}
-
-文件保存完成后，直接返回生成的情景内容。"""
+            # 构建用户提示词
+            user_message = self.build_user_prompt(history)
             
             await request_logger.log_info(f"开始生成情景，历史消息数量: {len(history)}")
             
