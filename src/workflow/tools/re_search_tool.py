@@ -1,7 +1,7 @@
 import re
 import json
 from langchain_core.tools import tool
-from src.workflow.context.history_manager import get_conversation_history
+from utils.history_manager import get_conversation_history
 
 
 @tool

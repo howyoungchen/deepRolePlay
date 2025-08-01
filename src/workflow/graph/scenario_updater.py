@@ -20,7 +20,7 @@ from src.workflow.tools.read_tool import read_target_file
 from src.workflow.tools.edit_tool import edit_file
 from src.workflow.tools.sequential_thinking import sequential_thinking
 from src.workflow.tools.re_search_tool import re_search
-from src.workflow.context.history_manager import set_conversation_history
+from utils.history_manager import set_conversation_history
 
 
 class MemoryFlashbackAgent:
