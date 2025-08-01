@@ -2,8 +2,15 @@
 情景更新工作流 - 使用LangGraph父图整合记忆闪回和情景更新
 """
 import asyncio
+import sys
+import os
 from typing import Dict, Any, List
 from typing_extensions import TypedDict
+
+# 添加项目根目录到Python路径
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import create_react_agent
@@ -230,27 +237,39 @@ def extract_latest_messages(messages: List[Dict[str, Any]]) -> str:
     return last_ai_message
 
 
-# 测试用的异步函数
-async def test_scenario_workflow():
-    """测试情景更新工作流"""
-    print("开始测试情景更新工作流...")
+# 流式事件测试函数
+async def test_workflow_streaming_events():
+    """测试工作流流式事件"""
+    from utils.pretty_print import pretty_print_stream_events
+    
+    print("开始测试工作流流式事件...")
     
     # 创建工作流
     workflow = create_scenario_workflow()
     
     # 模拟输入
     test_input = {
-        "current_scenario": "这是一个关于哈利波特的对话场景",
-        "last_ai_message": "守护神咒语是一个强大的防御魔法..."
+        "current_scenario": "这是一个魔法学院的场景",
+        "messages": [
+            {"role": "user", "content": "教我一些魔法咒语"},
+            {"role": "assistant", "content": "让我来教你几个基础的魔法咒语。首先是荧光闪烁咒(Lumos)，这是一个照明咒语..."}
+        ]
     }
     
-    # 调用工作流
-    result = await workflow.ainvoke(test_input)
-    
-    print(f"工作流执行完成:")
-    print(f"记忆闪回结果: {result.get('memory_flashback', '')[:100]}...")
-    print(f"最终情景结果: {result.get('final_scenario', '')[:100]}...")
+    try:
+        # 使用 astream_events 获取流式事件并美化输出
+        async for event in workflow.astream_events(test_input, version="v2"):
+            pretty_print_stream_events(event)
+                        
+    except Exception as e:
+        print(f"❌ 流式事件测试失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+
+
 
 
 if __name__ == "__main__":
-    asyncio.run(test_scenario_workflow())
+    asyncio.run(test_workflow_streaming_events())
