@@ -31,6 +31,7 @@ class ScenarioConfig(BaseModel):
 class LangGraphConfig(BaseModel):
     model: str = "deepseek-chat"
     max_history_length: int = 20
+    history_ai_message_offset: int = 1  # 从倒数第几个AI消息开始算历史记录
 
 
 class AgentConfig(BaseModel):

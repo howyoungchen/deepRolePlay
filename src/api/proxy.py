@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional, AsyncGenerator
 
 from config.manager import settings
 from utils.logger import request_logger
-from utils.message import inject_scenario
+from utils.messages_process import inject_scenario
 from src.scenario.manager import scenario_manager
 
 
@@ -91,11 +91,8 @@ class ProxyService:
         # 1. 提取原始消息
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         
-        # 2. 同步更新情景，等待完成
-        await scenario_manager.update_scenario(original_messages)
-        
-        # 3. 获取最新情景
-        current_scenario = await scenario_manager.get_current_scenario()
+        # 2. 同步更新情景并获取最新内容
+        current_scenario = await scenario_manager.update_scenario(original_messages)
         
         # 4. 将情景注入到消息中
         injected_messages = inject_scenario(original_messages, current_scenario)

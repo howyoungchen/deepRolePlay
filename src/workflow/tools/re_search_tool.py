@@ -1,12 +1,14 @@
 import re
 import json
 from langchain_core.tools import tool
-from utils.history_manager import get_conversation_history
+from langchain_core.runnables import RunnableConfig
+from typing import List, Dict, Any
 
 
 @tool
 def re_search(
     pattern: str,
+    config: RunnableConfig,
     reverse: bool = False,
     max_results: int = 10
 ) -> str:
@@ -69,8 +71,8 @@ def re_search(
         # 编译正则表达式
         regex = re.compile(pattern)
         
-        # 从全局状态获取对话历史
-        messages = get_conversation_history()
+        # 从config获取对话历史
+        messages = config.get("configurable", {}).get("conversation_history", [])
         
         # 如果对话历史为空，返回相应提示
         if not messages:
