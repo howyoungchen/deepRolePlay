@@ -72,16 +72,26 @@ class ScenarioManager:
             messages: 原始消息列表
         """
         try:
-            # 动态导入以避免循环依赖
-            from src.workflow.graph.scenario_updater import ScenarioUpdaterAgent
+            # 获取当前情景内容
+            current_scenario = await self.get_current_scenario()
             
-            # 创建工作流实例
-            updater = ScenarioUpdaterAgent()
+            # 动态导入新的工作流以避免循环依赖
+            from src.workflow.graph.scenario_workflow import create_scenario_workflow, extract_latest_messages
             
-            # 运行工作流生成新情景
-            new_scenario = await updater.generate_scenario(messages)
+            # 提取最新的AI和用户消息
+            last_ai_message, current_user_message = extract_latest_messages(messages)
             
-            if new_scenario and new_scenario.strip():
+            # 创建并调用工作流
+            workflow = create_scenario_workflow()
+            result = await workflow.ainvoke({
+                "current_scenario": current_scenario,
+                "last_ai_message": last_ai_message,
+                "current_user_message": current_user_message
+            })
+            
+            # 获取结果
+            new_scenario = result.get("final_scenario", "")
+            if new_scenario and new_scenario.strip() and new_scenario != "情景更新失败":
                 # 保存新情景到文件
                 await self._save_scenario_to_file(new_scenario)
                 
