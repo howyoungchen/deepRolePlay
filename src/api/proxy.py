@@ -94,6 +94,10 @@ class ProxyService:
         # 2. 同步更新情景并获取最新内容
         current_scenario = await scenario_manager.update_scenario(original_messages)
         
+        # 3.读取当前情景内容
+        from utils.scenario_utils import read_scenario
+        current_scenario= read_scenario()
+        
         # 4. 将情景注入到消息中
         injected_messages = inject_scenario(original_messages, current_scenario)
         

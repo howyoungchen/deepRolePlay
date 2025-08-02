@@ -25,17 +25,8 @@ class ScenarioManager:
         # 确保scenarios目录存在
         os.makedirs(os.path.dirname(self.scenario_file_path), exist_ok=True)
     
-    async def get_current_scenario(self) -> str:
-        """
-        获取当前情景内容
-        
-        Returns:
-            当前情景内容字符串
-        """
-        from utils.scenario_utils import read_scenario
-        return await read_scenario()
     
-    async def update_scenario(self, messages: List[Dict[str, Any]]) -> str:
+    async def update_scenario(self, messages: List[Dict[str, Any]]):
         """
         同步更新情景，等待完成并返回更新后的情景内容
         
@@ -47,30 +38,21 @@ class ScenarioManager:
         """
         try:
             # 获取当前情景内容
-            current_scenario = await self.get_current_scenario()
+            from utils.scenario_utils import read_scenario
+            current_scenario = read_scenario()
             
             # 动态导入新的工作流以避免循环依赖
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
             # 创建并调用工作流
             workflow = create_scenario_workflow()
-            result = await workflow.ainvoke({
+            await workflow.ainvoke({
                 "current_scenario": current_scenario,
                 "messages": messages
             })
-            
-            # 获取结果（工作流已经保存了文件，这里只是验证）
-            new_scenario = result.get("final_scenario", "")
-            if new_scenario and new_scenario.strip() and new_scenario != "情景更新失败":
-                await request_logger.log_info(f"情景更新成功，新情景长度: {len(new_scenario)}")
-                return new_scenario
-            else:
-                await request_logger.log_warning("工作流未生成有效的情景内容")
-                return ""
-                
+    
         except Exception as e:
-            await request_logger.log_error(f"同步情景更新失败: {str(e)}")
-            return ""
+            raise RuntimeError(f"更新情景失败: {str(e)}")
     
 
 
