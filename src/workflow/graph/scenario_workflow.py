@@ -289,10 +289,5 @@ async def test_workflow_streaming_events():
         import traceback
         traceback.print_exc()
 
-
-
-
-
-
 if __name__ == "__main__":
     asyncio.run(test_workflow_streaming_events())
