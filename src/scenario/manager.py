@@ -39,7 +39,7 @@ class ScenarioManager:
         try:
             # 获取当前情景内容
             from utils.scenario_utils import read_scenario
-            current_scenario = read_scenario()
+            current_scenario = await read_scenario()
             
             # 动态导入新的工作流以避免循环依赖
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
@@ -53,6 +53,38 @@ class ScenarioManager:
     
         except Exception as e:
             raise RuntimeError(f"更新情景失败: {str(e)}")
+    
+    async def update_scenario_streaming(self, messages: List[Dict[str, Any]]):
+        """
+        流式更新情景，返回工作流执行的流式事件
+        
+        Args:
+            messages: 原始消息列表
+            
+        Yields:
+            工作流执行的流式事件
+        """
+        try:
+            # 获取当前情景内容
+            from utils.scenario_utils import read_scenario
+            current_scenario = await read_scenario()
+            
+            # 动态导入新的工作流以避免循环依赖
+            from src.workflow.graph.scenario_workflow import create_scenario_workflow
+            
+            # 创建工作流
+            workflow = create_scenario_workflow()
+            
+            # 使用 astream_events 获取流式事件
+            async for event in workflow.astream_events({
+                "current_scenario": current_scenario,
+                "messages": messages
+            }, version="v2"):
+                yield event
+    
+        except Exception as e:
+            await request_logger.log_error(f"流式更新情景失败: {str(e)}")
+            raise RuntimeError(f"流式更新情景失败: {str(e)}")
     
 
 
