@@ -79,12 +79,12 @@ class ProxyService:
                     if chunk:
                         yield chunk
     
-    async def forward_request(
+    async def forward_non_streaming_request(
         self,
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """转发请求到目标LLM服务"""
+        """转发非流式请求到目标LLM服务"""
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
@@ -92,7 +92,11 @@ class ProxyService:
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         
         # 2. 同步更新情景并获取最新内容
-        current_scenario = await scenario_manager.update_scenario(original_messages)
+        await scenario_manager.update_scenario(original_messages)
+        
+        # 3.读取当前情景内容
+        from utils.scenario_utils import read_scenario
+        current_scenario = await read_scenario()
         
         # 4. 将情景注入到消息中
         injected_messages = inject_scenario(original_messages, current_scenario)
@@ -252,6 +256,79 @@ class ProxyService:
                 "X-Request-ID": request_id
             }
         )
+    
+    async def forward_streaming_request(
+        self,
+        request: Request,
+        chat_request: ChatCompletionRequest
+    ):
+        """转发流式请求（包含工作流流式输出）"""
+        request_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        # 1. 提取原始消息
+        original_messages = [msg.model_dump() for msg in chat_request.messages]
+        
+        chunks_count = 0
+        collected_chunks = []
+        
+        async def workflow_streaming_generator():
+            nonlocal chunks_count, collected_chunks
+            
+            try:
+                # 2. 先流式输出工作流事件
+                from utils.stream_converter import WorkflowStreamConverter
+                converter = WorkflowStreamConverter(request_id)
+                
+                workflow_events = scenario_manager.update_scenario_streaming(original_messages)
+                
+                async for sse_chunk in converter.convert_workflow_events(workflow_events):
+                    yield sse_chunk
+                
+                # 3. 工作流完成后，读取更新的情景内容
+                from utils.scenario_utils import read_scenario
+                current_scenario = await read_scenario()
+                
+                # 4. 将情景注入到消息中
+                injected_messages = inject_scenario(original_messages, current_scenario)
+                
+                # 5. 创建注入情景后的请求数据
+                request_data = chat_request.model_dump(exclude_none=True)
+                request_data["messages"] = injected_messages
+                
+                # 6. 流式输出LLM响应
+                async for llm_chunk in self._forward_streaming(request_data):
+                    chunks_count += 1
+                    collected_chunks.append(llm_chunk)
+                    yield llm_chunk
+                    
+            except Exception as e:
+                error_chunk = f"data: {{\"error\": \"工作流执行失败: {str(e)}\"}}\n\n"
+                yield error_chunk
+            finally:
+                duration = time.time() - start_time
+                # 解析流式响应得到最终结果
+                final_response = self._parse_streaming_response(collected_chunks)
+                await request_logger.log_streaming_request(
+                    request=request,
+                    request_body={"messages": original_messages, "workflow_streaming": True},
+                    status_code=200,
+                    chunks_count=chunks_count,
+                    final_response=final_response,
+                    duration=duration,
+                    request_id=request_id
+                )
+        
+        return StreamingResponse(
+            workflow_streaming_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Request-ID": request_id,
+                "X-Workflow-Streaming": "true"
+            }
+        )
 
 
 proxy_service = ProxyService()
@@ -260,7 +337,12 @@ proxy_service = ProxyService()
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
     """OpenAI兼容的聊天完成接口"""
-    return await proxy_service.forward_request(request, chat_request)
+    if chat_request.stream:
+        # 流式请求：包含工作流流式输出
+        return await proxy_service.forward_streaming_request(request, chat_request)
+    else:
+        # 非流式请求：传统的同步工作流处理
+        return await proxy_service.forward_non_streaming_request(request, chat_request)
 
 
 @router.get("/health")
