@@ -168,7 +168,9 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        await request_logger.log_error(f"记忆闪回节点执行失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        await request_logger.log_error(f"记忆闪回节点执行失败: {str(e)}\n详细错误:\n{error_details}")
         return {
             "memory_flashback": "=== 记忆闪回 ===\n\n记忆搜索出现错误，无法获取历史信息。",
             "last_ai_message": ""
@@ -179,11 +181,12 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
     """情景更新节点函数"""
     try:
         # ================ 提取和准备数据 ================
+        current_scenario = state.get("current_scenario", "")
         last_ai_message = state.get("last_ai_message", "")
         memory_flashback = state.get("memory_flashback", "")
         
         await request_logger.log_info(
-            f"开始情景更新，AI消息长度: {len(last_ai_message)}, 记忆闪回长度: {len(memory_flashback)}"
+            f"开始情景更新，当前情景长度: {len(current_scenario)}, AI消息长度: {len(last_ai_message)}, 记忆闪回长度: {len(memory_flashback)}"
         )
         
         # ================ 创建模型和代理 ================
@@ -202,6 +205,7 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
         scenario_file_path = get_scenario_file_path()
         
         user_prompt = SCENARIO_UPDATER_USER_TEMPLATE.format(
+            current_scenario=current_scenario if current_scenario else "[暂无当前情景]",
             last_ai_message=last_ai_message if last_ai_message else "[暂无最新消息]",
             memory_flashback=memory_flashback if memory_flashback else "[暂无记忆闪回信息]",
             scenario_file_path=scenario_file_path
@@ -288,11 +292,6 @@ async def test_workflow_streaming_events():
         print(f"❌ 流式事件测试失败: {str(e)}")
         import traceback
         traceback.print_exc()
-
-
-
-
-
 
 if __name__ == "__main__":
     asyncio.run(test_workflow_streaming_events())
