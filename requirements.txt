@@ -7,4 +7,8 @@ uvicorn
 python-multipart
 pyyaml
 langchain-openai
+langchain-core
+langchain-community
 langgraph
+typing-extensions
+wikipedia
