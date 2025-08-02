@@ -26,6 +26,28 @@ from src.workflow.tools.write_tool import write_file
 from src.workflow.tools.read_tool import read_target_file
 from src.workflow.tools.edit_tool import edit_file
 
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
+
+
+
+# 创建维基百科搜索工具
+def create_wikipedia_tool():
+    """创建维基百科搜索工具"""
+    api_wrapper = WikipediaAPIWrapper(
+        top_k_results=1,  # 返回前3个搜索结果
+        doc_content_chars_max=2000,  # 每个文档最大字符数
+        lang="zh"  # 使用中文维基百科
+    )
+    
+    wikipedia_tool = WikipediaQueryRun(
+        name="wikipedia_search",
+        description="在维基百科中搜索信息。输入应该是一个搜索查询。",
+        api_wrapper=api_wrapper
+    )
+    
+    return wikipedia_tool
+
 
 
 
@@ -109,12 +131,13 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
         )
         
         # ================ 创建模型和代理 ================
+        wikipedia_tool = create_wikipedia_tool()
         model = create_model()
         agent_config = settings.agent
         
         agent = create_react_agent(
             model=model,
-            tools=[sequential_thinking, re_search],
+            tools=[sequential_thinking, re_search, wikipedia_tool],
             prompt=MEMORY_FLASHBACK_PROMPT,
             debug=agent_config.debug,
         )
