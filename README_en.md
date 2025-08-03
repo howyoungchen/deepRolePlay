@@ -70,6 +70,7 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 
 5. **🎭 Start Role-Playing**
    - Immediately enjoy forgetting-free role-playing experience!
+   - **When changing characters**: Type "deeproleplay" and send to clear history cache and restart
 
 ### 🔧 Compatibility Description
 - ✅ **Fully Compatible with OpenAI API Format**: All tools supporting OpenAI can be used directly

@@ -1,7 +1,7 @@
 """
-消息处理工具函数
+Message processing utility functions
 
-提供各种消息列表处理的工具函数
+Provides various utility functions for processing message lists
 """
 from typing import List, Dict, Any
 from config.manager import settings
@@ -9,72 +9,72 @@ from config.manager import settings
 
 def inject_scenario(messages: List[Dict[str, Any]], scenario_content: str) -> List[Dict[str, Any]]:
     """
-    将情景内容注入到消息列表中，并根据max_history_length裁剪历史消息
+    Injects scenario content into the message list and trims history messages based on max_history_length.
     
     Args:
-        messages: 原始消息列表
-        scenario_content: 情景内容
+        messages: The original message list.
+        scenario_content: The scenario content.
         
     Returns:
-        注入情景后的消息列表
+        The message list after injecting the scenario.
     """
     if not messages:
         return messages
     
-    # 复制消息列表避免修改原始数据
+    # Copy the message list to avoid modifying the original data
     processed_messages = messages.copy()
     
-    # 1. 分离system消息和其他消息
-    # 部分LLM的系统提示词可能是以user身份放在第一条消息中，这里做兼容处理
+    # 1. Separate system messages from other messages
+    # Some LLMs' system prompts may be in the first message as a user role, handle this for compatibility
     system_messages = []
     other_messages = []
     
-    # 标记是否是第一条消息
+    # Flag to check if it is the first message
     is_first = True
     for msg in processed_messages:
-        # 如果是第一条消息且角色是user，或者角色是system，都视为系统消息
+        # If it's the first message and the role is 'user', or if the role is 'system', treat it as a system message
         if (is_first and msg.get("role") == "user") or msg.get("role") == "system":
             system_messages.append(msg)
         else:
             other_messages.append(msg)
         is_first = False
     
-    # 2. 根据max_history_length裁剪消息
+    # 2. Trim messages based on max_history_length
     max_history_length = settings.langgraph.max_history_length
     
     if max_history_length > 0:
-        # 从后往前计数AI消息
+        # Count AI messages from the end
         ai_message_count = 0
-        cutoff_index = 0  # 默认从开头保留所有消息
+        cutoff_index = 0  # Default to keeping all messages from the beginning
         
         for i in range(len(other_messages) - 1, -1, -1):
             if other_messages[i].get("role") == "assistant":
                 ai_message_count += 1
                 if ai_message_count >= max_history_length:
-                    # 找到第max_history_length条AI消息，从这里开始保留
+                    # Found the max_history_length-th AI message, keep messages from this point
                     cutoff_index = i
                     break
         
-        # 只有当找到足够的AI消息时才进行裁剪
+        # Trim only when enough AI messages are found
         if ai_message_count >= max_history_length:
             other_messages = other_messages[cutoff_index:]
     
-    # 3. 重新组合消息：system消息 + 裁剪后的其他消息
+    # 3. Recombine messages: system messages + trimmed other messages
     injected_messages = system_messages + other_messages
     
-    # 4. 在最后一个用户消息中注入情景内容
+    # 4. Inject scenario content into the last user message
     if scenario_content and scenario_content.strip():
-        # 查找最后一个用户消息并在其内容开头插入情景
+        # Find the last user message and insert the scenario at the beginning of its content
         for i in range(len(injected_messages) - 1, -1, -1):
             message = injected_messages[i]
             if message.get("role") == "user":
-                # 在用户消息内容开头加上情景
+                # Add scenario at the beginning of the user message content
                 original_content = message.get("content", "")
-                new_content = f"<当前情景>\n{scenario_content}\n</当前情景>\n\n{original_content}"
+                new_content = f"<current_scenario>\n{scenario_content}\n</current_scenario>\n\n{original_content}"
                 
-                # 创建新的消息对象
+                # Create a new message object
                 injected_messages[i] = {
-                    **message,  # 保持其他字段不变
+                    **message,  # Keep other fields unchanged
                     "content": new_content
                 }
                 break

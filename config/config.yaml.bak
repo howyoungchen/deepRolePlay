@@ -1,24 +1,26 @@
-# AI角色扮演代理系统配置文件
+# AI Role-Playing Agent System Configuration File
 
-# API代理相关配置
+# API Proxy Related Configuration
 proxy:
   target_url: "https://api.deepseek.com/v1"
   timeout: 30
 
-# 情景管理相关配置
+# Scenario Management Related Configuration
 scenario:
   file_path: "./scenarios/scenario.txt"
-  update_enabled: true
 
-# LangGraph工作流配置
+# Workflow Control Configuration
+workflow:
+  enabled: true  # Whether to enable the workflow, default is true
+
+# LangGraph Workflow Configuration
 langgraph:
-  model: "deepseek-chat"
   max_history_length: 7
-  history_ai_message_offset: 1  # 从倒数第几个AI消息开始算历史记录（1=最后一个AI消息之前都是历史）
+  history_ai_message_offset: 1  # Start counting history from the Nth-to-last AI message (1=all messages before the last AI message are history)
 
-# 代理配置
+# Agent Configuration
 agent:
-  # 模型配置
+  # Model Configuration
   model: "google/gemini-2.5-flash"
   temperature: 0.1
   base_url: "https://openrouter.ai/api/v1"
@@ -26,23 +28,20 @@ agent:
   max_tokens: 8192
   top_p: 0.9
   
-  # 调试和循环控制
+  # Debugging and Loop Control
   debug: false
-  max_iterations: 30
+  max_iterations: 25
   
   
-  # 超时设置
+  # Timeout Settings
   timeout: 120
-  
-  # 流式输出
-  stream_mode: "values"
 
-# 系统配置
+# System Configuration
 system:
   log_level: "INFO"
   log_dir: "./logs"
   
-# 服务器配置
+# Server Configuration
 server:
   host: "0.0.0.0"
   port: 6666

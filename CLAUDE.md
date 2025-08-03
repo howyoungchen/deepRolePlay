@@ -77,7 +77,11 @@ uv pip install -r requirements.txt
 
 ### 测试工作流
 ```bash
+# 测试完整工作流（包含记忆闪回和情景更新）
 python src/workflow/graph/scenario_workflow.py
+
+# 测试单个工作流组件
+PYTHONPATH=. python src/workflow/graph/scenario_workflow.py
 ```
 
 ### 测试单个Agent功能
@@ -167,6 +171,15 @@ system:
   log_level: "DEBUG"  # INFO, DEBUG, WARNING, ERROR
 ```
 
+### 检查配置文件语法
+```bash
+# 验证YAML配置文件语法
+python -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
+```
+
+### 端口冲突处理
+系统会自动检测端口占用，从配置的端口开始递增查找可用端口（最多尝试20个）。实际使用的端口会在终端输出中显示。
+
 ## 项目特性
 
 ### API兼容性
@@ -187,3 +200,35 @@ system:
 - 详细的错误日志记录（JSON格式）
 - 工作流执行异常捕获和处理
 - HTTP请求超时和重试机制
+
+## 架构细节
+
+### 数据流向
+```
+HTTP请求 → ProxyService → 
+  ↓
+情景注入(inject_scenario) → 
+  ↓
+ScenarioManager.update_scenario → 
+  ↓
+LangGraph工作流(scenario_workflow) →
+  ↓
+记忆闪回节点(memory_flashback_node) + 情景更新节点(scenario_updater_node) →
+  ↓
+文件系统(scenarios/*.txt) →
+  ↓
+目标LLM API调用 → 响应返回
+```
+
+### 关键组件交互
+- **ProxyService**: 处理HTTP代理，协调工作流调用
+- **ScenarioManager**: 管理情景生命周期，提供同步和流式接口
+- **LangGraph工作流**: 使用StateGraph管理复杂的多Agent执行流程
+- **工具系统**: 提供文件操作、搜索、思考等原子能力
+- **流式转换**: WorkflowStreamConverter将工作流事件转换为SSE格式
+
+### Agent配置要点
+- 记忆闪回Agent使用Wikipedia工具搜索外部知识
+- 情景更新Agent使用文件操作工具管理scenario文件
+- 两个Agent共享sequential_thinking工具进行推理
+- debug模式可输出详细的Agent执行信息
