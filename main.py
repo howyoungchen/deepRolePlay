@@ -56,8 +56,10 @@ async def shutdown_event():
 
 
 if __name__ == "__main__":
+    # 在打包环境下，直接传递app对象，而不是模块字符串
+    # 这样可以避免uvicorn在打包后找不到'main'模块的问题
     uvicorn.run(
-        "main:app",
+        app,
         host=settings.server.host,
         port=settings.server.port,
         reload=settings.server.reload,
