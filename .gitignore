@@ -12,3 +12,4 @@ __pycache__/
 config.yaml
 *.spec
 dist/
+build/
