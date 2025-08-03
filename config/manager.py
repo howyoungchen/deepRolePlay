@@ -27,11 +27,9 @@ class ServerConfig(BaseModel):
 
 class ScenarioConfig(BaseModel):
     file_path: str = "./scenarios/current_scenario.txt"
-    update_enabled: bool = True
 
 
 class LangGraphConfig(BaseModel):
-    model: str = "deepseek-chat"
     max_history_length: int = 20
     history_ai_message_offset: int = 1  # 从倒数第几个AI消息开始算历史记录
 
@@ -39,7 +37,7 @@ class LangGraphConfig(BaseModel):
 class AgentConfig(BaseModel):
     """代理配置"""
     # 模型配置
-    model: str = "deepseek-chat"
+    model: str = "google/gemini-2.5-flash"
     temperature: float = 0.7
     base_url: str = "https://api.deepseek.com/v1"
     api_key: str = "sk-your-api-key-here"
@@ -52,9 +50,6 @@ class AgentConfig(BaseModel):
     
     # 超时设置
     timeout: int = 120
-    
-    # 流式输出
-    stream_mode: str = "values"
 
 
 class Settings(BaseSettings):
