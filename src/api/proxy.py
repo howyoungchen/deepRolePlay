@@ -2,6 +2,8 @@ import json
 import time
 import uuid
 import httpx
+import os
+import glob
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
@@ -53,6 +55,147 @@ def _parse_upstream_error(response: httpx.Response) -> Dict[str, Any]:
 def _create_sse_error_chunk(error_data: Dict[str, Any]) -> str:
     """创建SSE格式的错误chunk"""
     return f"data: {json.dumps(error_data)}\n\n"
+
+
+def _check_new_conversation_trigger(messages: List[ChatMessage]) -> bool:
+    """检查是否触发新对话（检查最后两条user消息是否包含deeproleplay关键字）"""
+    user_messages = [msg for msg in messages if msg.role == "user"]
+    
+    # 获取最后两条user消息
+    last_two_user_messages = user_messages[-2:] if len(user_messages) >= 2 else user_messages
+    
+    # 检查是否包含deeproleplay关键字（不区分大小写）
+    for msg in last_two_user_messages:
+        if "deeproleplay" in msg.content.lower():
+            return True
+    
+    return False
+
+
+def _clear_scenarios_directory():
+    """清理scenarios目录下的所有文件"""
+    try:
+        scenarios_path = os.path.join(os.getcwd(), "scenarios")
+        if os.path.exists(scenarios_path):
+            # 获取目录下所有文件
+            files = glob.glob(os.path.join(scenarios_path, "*"))
+            for file_path in files:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            return True
+    except Exception as e:
+        print(f"清理scenarios目录失败: {e}")
+        return False
+    return True
+
+
+def _create_new_conversation_response(request_id: str, model: str, stream: bool = False) -> Dict[str, Any]:
+    """创建新对话成功响应"""
+    response_content = "已成功开启新的对话"
+    
+    if stream:
+        # 流式响应格式
+        return {
+            "id": f"chatcmpl-{request_id}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "delta": {
+                    "role": "assistant",
+                    "content": response_content
+                },
+                "finish_reason": "stop"
+            }]
+        }
+    else:
+        # 非流式响应格式
+        return {
+            "id": f"chatcmpl-{request_id}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response_content
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": len(response_content),
+                "total_tokens": 10 + len(response_content)
+            }
+        }
+
+
+async def _handle_new_conversation_request(
+    request: Request, 
+    chat_request: ChatCompletionRequest
+) -> Union[StreamingResponse, JSONResponse]:
+    """处理新对话请求的完整逻辑"""
+    # 清理scenarios目录
+    _clear_scenarios_directory()
+    
+    # 生成请求ID用于日志和响应
+    request_id = str(uuid.uuid4())
+    
+    # 先生成响应，然后记录日志
+    if chat_request.stream:
+        # 创建流式响应
+        response_data = _create_new_conversation_response(request_id, chat_request.model, stream=True)
+        
+        async def new_conversation_stream():
+            # 发送完整消息
+            yield f"data: {json.dumps(response_data)}\n\n"
+            # 发送结束标记
+            yield "data: [DONE]\n\n"
+        
+        response = StreamingResponse(
+            new_conversation_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Request-ID": request_id,
+                "X-New-Conversation": "true"
+            }
+        )
+        
+        # 记录新对话触发事件
+        await request_logger.log_request_response(
+            request=request,
+            response=response,
+            request_body={"trigger": "new_conversation", "model": chat_request.model},
+            response_body={"message": "新对话已开启", "scenarios_cleared": True, "stream": True},
+            duration=0.001,
+            request_id=request_id
+        )
+        
+        return response
+    else:
+        # 创建非流式响应
+        response_data = _create_new_conversation_response(request_id, chat_request.model, stream=False)
+        response = JSONResponse(
+            content=response_data,
+            status_code=200,
+            headers={"X-Request-ID": request_id, "X-New-Conversation": "true"}
+        )
+        
+        # 记录新对话触发事件
+        await request_logger.log_request_response(
+            request=request,
+            response=response,
+            request_body={"trigger": "new_conversation", "model": chat_request.model},
+            response_body={"message": "新对话已开启", "scenarios_cleared": True, "stream": False},
+            duration=0.001,
+            request_id=request_id
+        )
+        
+        return response
 
 
 class ProxyService:
@@ -528,6 +671,12 @@ proxy_service = ProxyService()
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
     """OpenAI兼容的聊天完成接口"""
+    
+    # 检查是否触发新对话
+    if _check_new_conversation_trigger(chat_request.messages):
+        return await _handle_new_conversation_request(request, chat_request)
+    
+    # 正常处理流程
     if chat_request.stream:
         # 流式请求：包含工作流流式输出
         return await proxy_service.forward_streaming_request(request, chat_request)
