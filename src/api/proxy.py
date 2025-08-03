@@ -58,6 +58,7 @@ def _create_sse_error_chunk(error_data: Dict[str, Any]) -> str:
 class ProxyService:
     def __init__(self):
         self.target_url = f"{settings.proxy.target_url.rstrip('/')}/chat/completions"
+        self.models_url = settings.proxy.get_models_url()
         self.timeout = settings.proxy.timeout
         
     def _get_headers(self, request: Request) -> Dict[str, str]:
@@ -456,6 +457,69 @@ class ProxyService:
                 "X-Workflow-Streaming": "true"
             }
         )
+    
+    async def forward_models_request(self, request: Request):
+        """转发models查询请求到目标LLM服务"""
+        request_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    self.models_url,
+                    headers=self._get_headers(request)
+                )
+                
+                duration = time.time() - start_time
+                
+                if response.status_code >= 400:
+                    # 处理错误响应
+                    error_data = _parse_upstream_error(response)
+                    json_response = JSONResponse(content=error_data, status_code=response.status_code)
+                    
+                    await request_logger.log_request_response(
+                        request=request,
+                        response=json_response,
+                        request_body={},
+                        response_body=error_data,
+                        duration=duration,
+                        request_id=request_id
+                    )
+                    
+                    return json_response
+                else:
+                    # 正常响应
+                    response_data = response.json()
+                    json_response = JSONResponse(content=response_data)
+                    
+                    await request_logger.log_request_response(
+                        request=request,
+                        response=json_response,
+                        request_body={},
+                        response_body=response_data,
+                        duration=duration,
+                        request_id=request_id
+                    )
+                    
+                    return json_response
+                    
+        except httpx.RequestError as e:
+            duration = time.time() - start_time
+            error_data = {"error": f"请求错误: {str(e)}"}
+            
+            await request_logger.log_request_response(
+                request=request,
+                response=None,
+                request_body={},
+                response_body=error_data,
+                duration=duration,
+                request_id=request_id
+            )
+            
+            raise HTTPException(
+                status_code=502,
+                detail=f"无法连接到上游服务: {str(e)}"
+            )
 
 
 proxy_service = ProxyService()
@@ -476,3 +540,9 @@ async def chat_completions(request: Request, chat_request: ChatCompletionRequest
 async def health_check():
     """健康检查接口"""
     return {"status": "healthy", "version": "1.0.0"}
+
+
+@router.get("/v1/models")
+async def list_models(request: Request):
+    """OpenAI兼容的模型列表查询接口"""
+    return await proxy_service.forward_models_request(request)

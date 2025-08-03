@@ -10,8 +10,21 @@ from typing import Optional, List
 
 class ProxyConfig(BaseModel):
     target_url: str = "https://api.openai.com/v1/chat/completions"
+    models_url: Optional[str] = None  # Models接口URL，如果不设置则从target_url自动构建
     api_key: Optional[str] = None  # API密钥从前端请求中获取，不再需要配置
     timeout: int = 30
+    
+    def get_models_url(self) -> str:
+        """获取models接口URL，如果未设置则从target_url自动构建"""
+        if self.models_url:
+            return self.models_url
+        # 从target_url提取base_url并构建models接口URL
+        if "/chat/completions" in self.target_url:
+            base_url = self.target_url.replace("/chat/completions", "")
+            return f"{base_url}/models"
+        else:
+            # 如果target_url不包含标准路径，假设它是base_url
+            return f"{self.target_url.rstrip('/')}/models"
 
 
 class SystemConfig(BaseModel):
