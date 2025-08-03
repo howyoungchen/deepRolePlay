@@ -1,4 +1,5 @@
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
@@ -8,6 +9,22 @@ from src.api.proxy import router as proxy_router
 from utils.logger import request_logger
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时执行
+    print("=== NarratorAI Proxy Server 启动 ===")
+    print(f"目标URL: {settings.proxy.target_url}")
+    print(f"日志目录: {settings.system.log_dir}")
+    print(f"服务器: {settings.server.host}:{settings.server.port}")
+    print("=====================================")
+    
+    yield
+    
+    # 关闭时执行
+    print("NarratorAI Proxy Server 已关闭")
+
+
 def create_app() -> FastAPI:
     """创建FastAPI应用"""
     app = FastAPI(
@@ -15,7 +32,8 @@ def create_app() -> FastAPI:
         description="AI角色扮演代理系统 - HTTP代理服务器",
         version="1.0.0",
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan
     )
     
     # 添加CORS中间件
@@ -37,22 +55,6 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-
-@app.on_event("startup")
-async def startup_event():
-    """应用启动事件"""
-    print("=== NarratorAI Proxy Server 启动 ===")
-    print(f"目标URL: {settings.proxy.target_url}")
-    print(f"日志目录: {settings.system.log_dir}")
-    print(f"服务器: {settings.server.host}:{settings.server.port}")
-    print("=====================================")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """应用关闭事件"""
-    print("NarratorAI Proxy Server 已关闭")
 
 
 if __name__ == "__main__":
