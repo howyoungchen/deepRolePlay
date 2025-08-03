@@ -10,8 +10,16 @@ from fastapi import Request, Response
 
 
 class RequestLogger:
-    def __init__(self, log_dir: str = "./logs/proxy"):
-        self.log_dir = Path(log_dir)
+    def __init__(self, log_dir: str = None):
+        # 如果没有提供log_dir，从配置中获取
+        if log_dir is None:
+            from config.manager import settings
+            base_log_dir = settings.system.log_dir
+            self.log_dir = Path(base_log_dir) / "proxy"
+        else:
+            self.log_dir = Path(log_dir)
+        
+        # 确保目录存在
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
     async def log_request_response(

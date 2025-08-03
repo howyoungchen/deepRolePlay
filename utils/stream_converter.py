@@ -15,7 +15,6 @@ class WorkflowStreamConverter:
         self.request_id = request_id or str(uuid.uuid4())
         self.created_time = int(time.time())
         self.current_node = None
-        self.message_buffer = ""
         self.ai_message_started = False
     
     def create_sse_data(self, content: str, event_type: str = "workflow") -> str:
@@ -111,7 +110,7 @@ class WorkflowStreamConverter:
                     header = f"\n💭 {self.current_node} 思考中:\n"
                     return self.create_sse_data(header, "ai_thinking")
                 
-                # 返回AI思考内容
+                # 直接转发，不缓冲
                 return self.create_sse_data(chunk.content, "ai_content")
         
         # AI消息结束

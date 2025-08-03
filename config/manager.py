@@ -29,6 +29,10 @@ class ScenarioConfig(BaseModel):
     file_path: str = "./scenarios/current_scenario.txt"
 
 
+class WorkflowConfig(BaseModel):
+    enabled: bool = True
+
+
 class LangGraphConfig(BaseModel):
     max_history_length: int = 20
     history_ai_message_offset: int = 1  # 从倒数第几个AI消息开始算历史记录
@@ -64,6 +68,7 @@ class Settings(BaseSettings):
     system: SystemConfig = SystemConfig()
     server: ServerConfig = ServerConfig()
     scenario: ScenarioConfig = ScenarioConfig()
+    workflow: WorkflowConfig = WorkflowConfig()
     langgraph: LangGraphConfig = LangGraphConfig()
     agent: AgentConfig = AgentConfig()
     

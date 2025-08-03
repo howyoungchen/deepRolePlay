@@ -5,7 +5,7 @@ import httpx
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from typing import List, Dict, Any, Optional, AsyncGenerator, Union
 
 from config.manager import settings
 from utils.logger import request_logger
@@ -33,6 +33,28 @@ class ChatCompletionRequest(BaseModel):
 router = APIRouter()
 
 
+def _parse_upstream_error(response: httpx.Response) -> Dict[str, Any]:
+    """解析上游服务的错误响应，保持原始格式"""
+    try:
+        # 尝试解析JSON错误响应
+        error_data = response.json()
+        return error_data
+    except (json.JSONDecodeError, ValueError):
+        # 如果不是JSON格式，构造标准错误格式
+        return {
+            "error": {
+                "message": response.text or f"HTTP {response.status_code} Error",
+                "type": "upstream_error",
+                "code": response.status_code
+            }
+        }
+
+
+def _create_sse_error_chunk(error_data: Dict[str, Any]) -> str:
+    """创建SSE格式的错误chunk"""
+    return f"data: {json.dumps(error_data)}\n\n"
+
+
 class ProxyService:
     def __init__(self):
         self.target_url = f"{settings.proxy.target_url.rstrip('/')}/chat/completions"
@@ -56,7 +78,7 @@ class ProxyService:
         self, 
         request: Request,
         request_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], tuple]:
         """转发非流式请求"""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
@@ -64,14 +86,19 @@ class ProxyService:
                 headers=self._get_headers(request),
                 json=request_data
             )
-            response.raise_for_status()
+            
+            if response.status_code >= 400:
+                # 返回错误数据和状态码
+                error_data = _parse_upstream_error(response)
+                return error_data, response.status_code
+            
             return response.json()
     
     async def _forward_streaming(
         self, 
         request: Request,
         request_data: Dict[str, Any]
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[Union[str, Dict[str, Any]], None]:
         """转发流式请求"""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
@@ -80,7 +107,22 @@ class ProxyService:
                 headers=self._get_headers(request),
                 json=request_data
             ) as response:
-                response.raise_for_status()
+                if response.status_code >= 400:
+                    # 读取错误响应内容
+                    error_content = await response.aread()
+                    # 尝试解析为JSON
+                    try:
+                        error_data = json.loads(error_content.decode('utf-8'))
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        error_data = {
+                            "error": {
+                                "message": error_content.decode('utf-8') or f"HTTP {response.status_code} Error",
+                                "type": "upstream_error",
+                                "code": response.status_code
+                            }
+                        }
+                    yield {"error": True, "status_code": response.status_code, "data": error_data}
+                    return
                 
                 async for chunk in response.aiter_text():
                     if chunk:
@@ -98,17 +140,23 @@ class ProxyService:
         # 1. 提取原始消息
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         
-        # 2. 同步更新情景并获取最新内容
-        await scenario_manager.update_scenario(original_messages)
+        # 2. 检查工作流是否启用
+        if settings.workflow.enabled:
+            # 工作流启用：执行完整的情景处理流程
+            # 2a. 同步更新情景并获取最新内容
+            await scenario_manager.update_scenario(original_messages)
+            
+            # 3. 读取当前情景内容
+            from utils.scenario_utils import read_scenario
+            current_scenario = await read_scenario()
+            
+            # 4. 将情景注入到消息中
+            injected_messages = inject_scenario(original_messages, current_scenario)
+        else:
+            # 工作流禁用：直接使用原始消息
+            injected_messages = original_messages
         
-        # 3.读取当前情景内容
-        from utils.scenario_utils import read_scenario
-        current_scenario = await read_scenario()
-        
-        # 4. 将情景注入到消息中
-        injected_messages = inject_scenario(original_messages, current_scenario)
-        
-        # 5. 创建注入情景后的请求数据
+        # 5. 创建请求数据
         request_data = chat_request.model_dump(exclude_none=True)
         request_data["messages"] = injected_messages
         
@@ -121,20 +169,6 @@ class ProxyService:
                 return await self._handle_non_streaming_request(
                     request, request_data, request_id, start_time
                 )
-        except httpx.HTTPStatusError as e:
-            duration = time.time() - start_time
-            await request_logger.log_request_response(
-                request=request,
-                response=None,
-                request_body=request_data,
-                response_body={"error": f"HTTP {e.response.status_code}: {e.response.text}"},
-                duration=duration,
-                request_id=request_id
-            )
-            raise HTTPException(
-                status_code=e.response.status_code,
-                detail=f"上游服务错误: {e.response.text}"
-            )
         except httpx.RequestError as e:
             duration = time.time() - start_time
             await request_logger.log_request_response(
@@ -158,21 +192,39 @@ class ProxyService:
         start_time: float
     ):
         """处理非流式请求"""
-        response_data = await self._forward_non_streaming(request, request_data)
+        result = await self._forward_non_streaming(request, request_data)
         duration = time.time() - start_time
         
-        response = JSONResponse(content=response_data)
-        
-        await request_logger.log_request_response(
-            request=request,
-            response=response,
-            request_body=request_data,
-            response_body=response_data,
-            duration=duration,
-            request_id=request_id
-        )
-        
-        return response
+        # 检查是否为错误响应
+        if isinstance(result, tuple):
+            error_data, status_code = result
+            response = JSONResponse(content=error_data, status_code=status_code)
+            
+            await request_logger.log_request_response(
+                request=request,
+                response=response,
+                request_body=request_data,
+                response_body=error_data,
+                duration=duration,
+                request_id=request_id
+            )
+            
+            return response
+        else:
+            # 正常响应
+            response_data = result
+            response = JSONResponse(content=response_data)
+            
+            await request_logger.log_request_response(
+                request=request,
+                response=response,
+                request_body=request_data,
+                response_body=response_data,
+                duration=duration,
+                request_id=request_id
+            )
+            
+            return response
     
     def _parse_streaming_response(self, raw_chunks: List[str]) -> Dict[str, Any]:
         """解析流式响应，提取最终结果"""
@@ -231,18 +283,47 @@ class ProxyService:
     ):
         """处理流式请求"""
         chunks_count = 0
-        collected_chunks = []
+        collected_chunks = []  # 只用于日志记录
         
         async def stream_generator():
             nonlocal chunks_count, collected_chunks
             try:
                 async for chunk in self._forward_streaming(request, request_data):
+                    # 检查是否为错误响应
+                    if isinstance(chunk, dict) and chunk.get("error"):
+                        error_data = chunk["data"]
+                        error_chunk = _create_sse_error_chunk(error_data)
+                        yield error_chunk
+                        # 记录错误到日志
+                        await request_logger.log_streaming_request(
+                            request=request,
+                            request_body=request_data,
+                            status_code=chunk["status_code"],
+                            chunks_count=0,
+                            final_response=error_data,
+                            duration=time.time() - start_time,
+                            request_id=request_id
+                        )
+                        return
+                    
                     chunks_count += 1
-                    collected_chunks.append(chunk)
+                    # 只在需要日志时收集chunks，立即转发
+                    if chunks_count <= 1000:  # 限制收集数量，避免内存问题
+                        collected_chunks.append(chunk)
                     yield chunk
+            except Exception as e:
+                error_data = {
+                    "error": {
+                        "message": str(e),
+                        "type": "streaming_error",
+                        "code": "STREAM_ERROR"
+                    }
+                }
+                error_chunk = _create_sse_error_chunk(error_data)
+                yield error_chunk
             finally:
                 duration = time.time() - start_time
-                # 解析流式响应得到最终结果
+                # 解析流式响应得到最终结果（用于日志）
                 final_response = self._parse_streaming_response(collected_chunks)
                 await request_logger.log_streaming_request(
                     request=request,
@@ -288,37 +369,70 @@ class ProxyService:
             nonlocal chunks_count, collected_chunks, request_data
             
             try:
-                # 2. 先流式输出工作流事件
-                from utils.stream_converter import WorkflowStreamConverter
-                converter = WorkflowStreamConverter(request_id)
-                
-                workflow_events = scenario_manager.update_scenario_streaming(original_messages)
-                
-                async for sse_chunk in converter.convert_workflow_events(workflow_events):
-                    yield sse_chunk
-                
-                # 3. 工作流完成后，读取更新的情景内容
-                from utils.scenario_utils import read_scenario
-                current_scenario = await read_scenario()
-                
-                # 4. 将情景注入到消息中
-                injected_messages = inject_scenario(original_messages, current_scenario)
+                # 2. 检查工作流是否启用
+                if settings.workflow.enabled:
+                    # 工作流启用：先流式输出工作流事件
+                    from utils.stream_converter import WorkflowStreamConverter
+                    converter = WorkflowStreamConverter(request_id)
+                    
+                    workflow_events = scenario_manager.update_scenario_streaming(original_messages)
+                    
+                    async for sse_chunk in converter.convert_workflow_events(workflow_events):
+                        yield sse_chunk
+                    
+                    # 3. 工作流完成后，读取更新的情景内容
+                    from utils.scenario_utils import read_scenario
+                    current_scenario = await read_scenario()
+                    
+                    # 4. 将情景注入到消息中
+                    injected_messages = inject_scenario(original_messages, current_scenario)
+                else:
+                    # 工作流禁用：直接使用原始消息
+                    injected_messages = original_messages
                 
                 # 5. 更新 request_data 中的 messages
                 request_data["messages"] = injected_messages
                 
                 # 6. 流式输出LLM响应
                 async for llm_chunk in self._forward_streaming(request, request_data):
+                    # 检查是否为错误响应
+                    if isinstance(llm_chunk, dict) and llm_chunk.get("error"):
+                        error_data = llm_chunk["data"]
+                        error_chunk = _create_sse_error_chunk(error_data)
+                        yield error_chunk
+                        # 记录错误到日志
+                        await request_logger.log_streaming_request(
+                            request=request,
+                            request_body=request_data,
+                            status_code=llm_chunk["status_code"],
+                            chunks_count=chunks_count,
+                            final_response=error_data,
+                            duration=time.time() - start_time,
+                            request_id=request_id
+                        )
+                        return
+                    
                     chunks_count += 1
-                    collected_chunks.append(llm_chunk)
+                    # 只在需要日志时收集chunks，立即转发
+                    if chunks_count <= 1000:  # 限制收集数量，避免内存问题
+                        collected_chunks.append(llm_chunk)
                     yield llm_chunk
                     
             except Exception as e:
-                error_chunk = f"data: {{\"error\": \"工作流执行失败: {str(e)}\"}}\n\n"
+                # 区分工作流错误和LLM转发错误
+                error_message = f"工作流执行失败: {str(e)}" if "workflow" in str(e).lower() else f"LLM服务错误: {str(e)}"
+                error_data = {
+                    "error": {
+                        "message": error_message,
+                        "type": "workflow_streaming_error",
+                        "code": "WORKFLOW_ERROR"
+                    }
+                }
+                error_chunk = _create_sse_error_chunk(error_data)
                 yield error_chunk
             finally:
                 duration = time.time() - start_time
-                # 解析流式响应得到最终结果
+                # 解析流式响应得到最终结果（用于日志）
                 final_response = self._parse_streaming_response(collected_chunks)
                 
                 # 使用更新后的 request_data 记录日志
