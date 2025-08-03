@@ -272,8 +272,13 @@ class ProxyService:
         chunks_count = 0
         collected_chunks = []
         
+        # 将 request_data 初始化提前，以便在 finally 中访问
+        request_data = chat_request.model_dump(exclude_none=True)
+        # 先用原始消息填充，如果后续步骤失败，也能记录原始请求
+        request_data["messages"] = original_messages
+        
         async def workflow_streaming_generator():
-            nonlocal chunks_count, collected_chunks
+            nonlocal chunks_count, collected_chunks, request_data
             
             try:
                 # 2. 先流式输出工作流事件
@@ -292,8 +297,7 @@ class ProxyService:
                 # 4. 将情景注入到消息中
                 injected_messages = inject_scenario(original_messages, current_scenario)
                 
-                # 5. 创建注入情景后的请求数据
-                request_data = chat_request.model_dump(exclude_none=True)
+                # 5. 更新 request_data 中的 messages
                 request_data["messages"] = injected_messages
                 
                 # 6. 流式输出LLM响应
@@ -309,9 +313,11 @@ class ProxyService:
                 duration = time.time() - start_time
                 # 解析流式响应得到最终结果
                 final_response = self._parse_streaming_response(collected_chunks)
+                
+                # 使用更新后的 request_data 记录日志
                 await request_logger.log_streaming_request(
                     request=request,
-                    request_body={"messages": original_messages, "workflow_streaming": True},
+                    request_body=request_data,
                     status_code=200,
                     chunks_count=chunks_count,
                     final_response=final_response,
