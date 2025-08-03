@@ -25,14 +25,19 @@ def inject_scenario(messages: List[Dict[str, Any]], scenario_content: str) -> Li
     processed_messages = messages.copy()
     
     # 1. 分离system消息和其他消息
+    # 部分LLM的系统提示词可能是以user身份放在第一条消息中，这里做兼容处理
     system_messages = []
     other_messages = []
     
+    # 标记是否是第一条消息
+    is_first = True
     for msg in processed_messages:
-        if msg.get("role") == "system":
+        # 如果是第一条消息且角色是user，或者角色是system，都视为系统消息
+        if (is_first and msg.get("role") == "user") or msg.get("role") == "system":
             system_messages.append(msg)
         else:
             other_messages.append(msg)
+        is_first = False
     
     # 2. 根据max_history_length裁剪消息
     max_history_length = settings.langgraph.max_history_length

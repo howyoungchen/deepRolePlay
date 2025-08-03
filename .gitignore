@@ -10,3 +10,5 @@ __pycache__/
 *.pkl
 .claude
 config.yaml
+*.spec
+dist/

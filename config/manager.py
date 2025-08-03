@@ -1,4 +1,5 @@
 import os
+import sys
 import yaml
 from pathlib import Path
 from pydantic import BaseModel
@@ -71,11 +72,22 @@ class Settings(BaseSettings):
     agent: AgentConfig = AgentConfig()
     
     @classmethod
-    def load_from_yaml(cls, yaml_path: str = "config/config.yaml") -> "Settings":
+    def load_from_yaml(cls, yaml_path: Optional[str] = None) -> "Settings":
         """从YAML文件加载配置"""
+        if yaml_path is None:
+            # 判断是否是打包环境
+            if getattr(sys, 'frozen', False):
+                # 打包后的exe所在目录
+                base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(sys.executable).parent
+            else:
+                # 脚本运行环境
+                base_path = Path(__file__).parent.parent
+            
+            yaml_path = base_path / "config" / "config.yaml"
+
         config_path = Path(yaml_path)
         if not config_path.exists():
-            print(f"配置文件 {yaml_path} 不存在，使用默认配置")
+            print(f"配置文件 {config_path} 不存在，使用默认配置")
             return cls()
         
         try:
@@ -91,4 +103,5 @@ class Settings(BaseSettings):
             return cls()
 
 
+# 在调用时不再传递固定路径
 settings = Settings.load_from_yaml()
