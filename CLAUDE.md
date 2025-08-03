@@ -57,14 +57,46 @@ uv run python main.py
 uvicorn main:app --host 0.0.0.0 --port 6666 --reload
 ```
 
+### 环境要求
+- Python 3.12
+- UV 包管理器（推荐）
+
 ### 安装依赖
 ```bash
+# 使用pip安装
 pip install -r requirements.txt
+
+# 使用uv安装（推荐）
+uv pip install -r requirements.txt
 ```
 
 ### 测试工作流
 ```bash
 python src/workflow/graph/scenario_workflow.py
+```
+
+### 测试单个Agent功能
+```bash
+# 测试记忆闪回Agent（需要先配置API密钥）
+PYTHONPATH=. python -c "
+from src.workflow.graph.scenario_workflow import MemoryFlashbackAgent
+import asyncio
+
+async def test_memory_only():
+    agent = MemoryFlashbackAgent()
+    
+    history = [
+        {'role': 'user', 'content': '我想了解embedding和向量检索的技术。'},
+        {'role': 'assistant', 'content': '这些是现代AI系统的重要组件。'}
+    ]
+    
+    current_scenario = '张三是数据科学家，正在研究向量数据库'
+    result = await agent.search_memories(current_scenario, history)
+    print('记忆闪回结果:')
+    print(result)
+
+asyncio.run(test_memory_only())
+"
 ```
 
 ### 指定配置文件启动
@@ -99,3 +131,27 @@ python main.py --config_path /path/to/config.yaml
 - 记忆闪回使用中文Wikipedia API，返回压缩的相关信息
 - 所有API调用和工具执行都在LangGraph代理框架内进行
 - 日志系统使用结构化JSON格式，便于后续分析
+
+## 调试和日志
+
+### 查看运行日志
+```bash
+# 查看最新的日志文件
+ls -la logs/proxy/
+
+# 实时监控日志
+tail -f logs/proxy/$(ls -t logs/proxy/ | head -1)
+```
+
+### 调试Agent工作流
+在 `config/config.yaml` 中设置：
+```yaml
+agent:
+  debug: true  # 启用调试模式，输出详细的Agent执行信息
+```
+
+### 修改日志级别
+```yaml
+system:
+  log_level: "DEBUG"  # INFO, DEBUG, WARNING, ERROR
+```
