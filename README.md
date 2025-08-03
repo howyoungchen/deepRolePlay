@@ -10,7 +10,7 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 
 ## 🚀 解决角色扮演核心痛点
 
-<img src="pics/generate.png" alt="DeepRolePlay演示" width="150">
+<img src="pics/generate.png" alt="DeepRolePlay演示" width="200">
 
 ### 😤 你是否遇到过这些问题？
 - 🤖 **AI 突然忘记角色设定**：明明是法师却拿起了剑
@@ -59,7 +59,8 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 
 3. **🚀 启动程序**
    - 双击 `DeepRolePlay.exe` 启动
-   - 看到 "服务已启动" 提示即可
+   - 看到终端里项目正常运行即可
+   - 🌟本项目会检查端口是否被占用。如果被占用会自动+1.所以最终真正的端口需要用户检查终端输出
 
 4. **🔗 配置角色扮演前端**
    - 在 SillyTavern、OpenWebUI 等平台中
@@ -167,6 +168,9 @@ uv run python main.py
 ```
 http://localhost:6666/v1
 ```
+
+
+> 🌟本项目会检查端口是否被占用。如果被占用会自动+1.所以最终真正的端口需要用户检查终端输出
 
 系统将自动：
 1. 拦截对话请求

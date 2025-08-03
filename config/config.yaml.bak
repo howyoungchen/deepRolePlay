@@ -19,9 +19,9 @@ langgraph:
 # 代理配置
 agent:
   # 模型配置
-  model: "deepseek-chat"
+  model: "google/gemini-2.5-flash"
   temperature: 0.1
-  base_url: "https://api.deepseek.com/v1"
+  base_url: "https://openrouter.ai/api/v1"
   api_key: "YOUR_API_KEY_HERE"
   max_tokens: 8192
   top_p: 0.9
