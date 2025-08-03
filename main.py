@@ -12,32 +12,32 @@ from utils.logger import request_logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
-    # 启动时执行
-    print("=== DeepRolePlay Proxy Server 启动 ===")
-    print(f"目标URL: {settings.proxy.target_url}")
-    print(f"日志目录: {settings.system.log_dir}")
-    print(f"服务器: {settings.server.host}:{settings.server.port}")
+    """Application lifecycle management"""
+    # Execute on startup
+    print("=== DeepRolePlay Proxy Server Starting ===")
+    print(f"Target URL: {settings.proxy.target_url}")
+    print(f"Log Directory: {settings.system.log_dir}")
+    print(f"Server: {settings.server.host}:{settings.server.port}")
     print("=====================================")
     
     yield
     
-    # 关闭时执行
-    print("DeepRolePlay Proxy Server 已关闭")
+    # Execute on shutdown
+    print("DeepRolePlay Proxy Server has been shut down")
 
 
 def create_app() -> FastAPI:
-    """创建FastAPI应用"""
+    """Create FastAPI application"""
     app = FastAPI(
         title="DeepRolePlay Proxy Server",
-        description="AI角色扮演代理系统 - HTTP代理服务器",
+        description="AI Role-playing Proxy System - HTTP Proxy Server",
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan
     )
     
-    # 添加CORS中间件
+    # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -46,10 +46,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # 注册路由
+    # Register routes
     app.include_router(proxy_router, prefix="", tags=["proxy"])
     
-    # 确保日志目录存在
+    # Ensure log directory exists
     Path(settings.system.log_dir).mkdir(exist_ok=True)
     
     return app
@@ -59,39 +59,39 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    # 在打包环境下，直接传递app对象，而不是模块字符串
-    # 这样可以避免uvicorn在打包后找不到'main'模块的问题
+    # In a packaged environment, pass the app object directly instead of a module string
+    # This avoids the issue of uvicorn not being able to find the 'main' module after packaging
     
     import socket
     import asyncio
     
-    # 端口自动递增功能
+    # Port auto-increment feature
     max_attempts = 20
     base_port = settings.server.port
     port_found = False
     current_port = base_port
     
-    # 先检查端口是否可用
+    # First, check if the port is available
     for i in range(max_attempts):
         current_port = base_port + i
         
-        # 使用 socket 检查端口是否可用
+        # Use a socket to check if the port is available
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            # 尝试绑定端口
+            # Try to bind the port
             sock.bind((settings.server.host, current_port))
             sock.close()
-            # 端口可用
+            # Port is available
             port_found = True
-            print(f"找到可用端口: {current_port}")
+            print(f"Found available port: {current_port}")
             break
         except OSError as e:
-            # 端口被占用
+            # Port is in use
             if i < max_attempts - 1:
-                print(f"端口 {current_port} 已被占用，尝试下一个端口...")
+                print(f"Port {current_port} is already in use, trying the next one...")
                 continue
             else:
-                print(f"错误：已尝试 {max_attempts} 个端口（{base_port}-{base_port + max_attempts - 1}），全部被占用")
+                print(f"Error: Tried {max_attempts} ports ({base_port}-{base_port + max_attempts - 1}), all are in use")
                 sys.exit(1)
         finally:
             try:
@@ -100,11 +100,11 @@ if __name__ == "__main__":
                 pass
     
     if port_found:
-        # 更新设置中的端口
+        # Update the port in settings
         settings.server.port = current_port
         
         try:
-            # 启动服务器
+            # Start the server
             uvicorn.run(
                 app,
                 host=settings.server.host,
@@ -113,11 +113,11 @@ if __name__ == "__main__":
                 log_level=settings.system.log_level.lower()
             )
         except KeyboardInterrupt:
-            print("\n服务器已被用户中断")
+            print("\nServer has been interrupted by the user")
             sys.exit(0)
         except Exception as e:
-            print(f"启动服务器时发生错误: {e}")
+            print(f"An error occurred while starting the server: {e}")
             raise
     else:
-        print(f"错误：无法找到可用端口")
+        print(f"Error: Could not find an available port")
         sys.exit(1)

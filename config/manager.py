@@ -10,20 +10,20 @@ from typing import Optional, List
 
 class ProxyConfig(BaseModel):
     target_url: str = "https://api.openai.com/v1/chat/completions"
-    models_url: Optional[str] = None  # Models接口URL，如果不设置则从target_url自动构建
-    api_key: Optional[str] = None  # API密钥从前端请求中获取，不再需要配置
+    models_url: Optional[str] = None  # The URL for the models API. If not set, it's automatically constructed from target_url.
+    api_key: Optional[str] = None  # API key is obtained from the frontend request, no longer needs to be configured.
     timeout: int = 30
     
     def get_models_url(self) -> str:
-        """获取models接口URL，如果未设置则从target_url自动构建"""
+        """Get the models API URL. If not set, it's automatically constructed from target_url."""
         if self.models_url:
             return self.models_url
-        # 从target_url提取base_url并构建models接口URL
+        # Extract base_url from target_url and construct the models API URL.
         if "/chat/completions" in self.target_url:
             base_url = self.target_url.replace("/chat/completions", "")
             return f"{base_url}/models"
         else:
-            # 如果target_url不包含标准路径，假设它是base_url
+            # If target_url does not contain a standard path, assume it is the base_url.
             return f"{self.target_url.rstrip('/')}/models"
 
 
@@ -48,12 +48,12 @@ class WorkflowConfig(BaseModel):
 
 class LangGraphConfig(BaseModel):
     max_history_length: int = 20
-    history_ai_message_offset: int = 1  # 从倒数第几个AI消息开始算历史记录
+    history_ai_message_offset: int = 1  # Start counting history from the Nth-to-last AI message.
 
 
 class AgentConfig(BaseModel):
-    """代理配置"""
-    # 模型配置
+    """Agent Configuration"""
+    # Model Configuration
     model: str = "google/gemini-2.5-flash"
     temperature: float = 0.7
     base_url: str = "https://api.deepseek.com/v1"
@@ -61,11 +61,11 @@ class AgentConfig(BaseModel):
     max_tokens: int = 8192
     top_p: float = 0.9
     
-    # 调试和循环控制
+    # Debugging and Loop Control
     debug: bool = False
     max_iterations: int = 25
     
-    # 超时设置
+    # Timeout Settings
     timeout: int = 120
 
 
@@ -87,38 +87,38 @@ class Settings(BaseSettings):
     
     @classmethod
     def load_from_yaml(cls, yaml_path: Optional[str] = None) -> "Settings":
-        """从YAML文件加载配置"""
+        """Load settings from a YAML file."""
         if yaml_path is None:
-            # 优先从命令行参数中获取配置路径
-            # add_help=False 避免与 uvicorn 等其他库的 -h 参数冲突
+            # Prioritize getting the config path from command-line arguments.
+            # add_help=False to avoid conflicts with -h argument from other libraries like uvicorn.
             parser = argparse.ArgumentParser(add_help=False)
-            parser.add_argument('--config_path', type=str, default=None, help="指定配置文件路径")
-            # parse_known_args() 只解析已定义的参数，忽略其他未知参数
+            parser.add_argument('--config_path', type=str, default=None, help="Specify the configuration file path.")
+            # parse_known_args() parses only defined arguments and ignores other unknown ones.
             args, _ = parser.parse_known_args()
 
             if args.config_path:
-                # 如果命令行参数提供了路径，则使用该路径
+                # If a path is provided via command-line arguments, use it.
                 yaml_path = args.config_path
             else:
-                # 1. 优先检查当前运行目录下的 config.yaml
+                # 1. First, check for config.yaml in the current working directory.
                 current_dir_config = Path.cwd() / "config.yaml"
                 if current_dir_config.exists():
                     yaml_path = current_dir_config
                 else:
-                    # 2. 回退到项目目录下的 config/config.yaml
-                    # 判断是否是打包环境
+                    # 2. Fallback to config/config.yaml in the project directory.
+                    # Check if it's a packaged environment.
                     if getattr(sys, 'frozen', False):
-                        # 打包后的exe所在目录
+                        # The directory where the packaged .exe is located.
                         base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(sys.executable).parent
                     else:
-                        # 脚本运行环境
+                        # Script execution environment.
                         base_path = Path(__file__).parent.parent
                     
                     yaml_path = base_path / "config" / "config.yaml"
 
         config_path = Path(yaml_path)
         if not config_path.exists():
-            print(f"配置文件 {config_path} 不存在，使用默认配置")
+            print(f"Configuration file {config_path} not found, using default settings.")
             return cls()
         
         try:
@@ -130,9 +130,9 @@ class Settings(BaseSettings):
             
             return cls(**yaml_data)
         except Exception as e:
-            print(f"加载配置文件失败: {e}")
+            print(f"Failed to load configuration file: {e}")
             return cls()
 
 
-# 在调用时不再传递固定路径
+# No longer pass a fixed path when calling.
 settings = Settings.load_from_yaml()

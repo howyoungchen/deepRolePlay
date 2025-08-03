@@ -11,7 +11,7 @@ from fastapi import Request, Response
 
 class RequestLogger:
     def __init__(self, log_dir: str = None):
-        # 如果没有提供log_dir，从配置中获取
+        # If log_dir is not provided, get it from the configuration
         if log_dir is None:
             from config.manager import settings
             base_log_dir = settings.system.log_dir
@@ -19,7 +19,7 @@ class RequestLogger:
         else:
             self.log_dir = Path(log_dir)
         
-        # 确保目录存在
+        # Ensure the directory exists
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
     async def log_request_response(
@@ -31,7 +31,7 @@ class RequestLogger:
         duration: float,
         request_id: str = None
     ):
-        """记录请求和响应到JSON文件"""
+        """Log request and response to a JSON file."""
         if request_id is None:
             request_id = str(uuid.uuid4())
         
@@ -61,7 +61,7 @@ class RequestLogger:
             async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(log_data, ensure_ascii=False, indent=2))
         except Exception as e:
-            print(f"写入日志文件失败: {e}")
+            print(f"Failed to write to log file: {e}")
     
     async def log_streaming_request(
         self,
@@ -73,7 +73,7 @@ class RequestLogger:
         duration: float,
         request_id: str = None
     ):
-        """记录流式请求"""
+        """Log streaming request."""
         if request_id is None:
             request_id = str(uuid.uuid4())
         
@@ -105,10 +105,10 @@ class RequestLogger:
             async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(log_data, ensure_ascii=False, indent=2))
         except Exception as e:
-            print(f"写入日志文件失败: {e}")
+            print(f"Failed to write to log file: {e}")
     
     async def log_info(self, message: str):
-        """记录信息日志"""
+        """Log an informational message."""
         timestamp = datetime.now()
         filename = f"{timestamp.strftime('%Y_%m_%d_%H_%M_%S')}_info.json"
         log_data = {
@@ -120,7 +120,7 @@ class RequestLogger:
         await self._write_log_file(filename, log_data)
     
     async def log_error(self, message: str):
-        """记录错误日志"""
+        """Log an error message."""
         timestamp = datetime.now()
         filename = f"{timestamp.strftime('%Y_%m_%d_%H_%M_%S')}_error.json"
         log_data = {
@@ -132,7 +132,7 @@ class RequestLogger:
         await self._write_log_file(filename, log_data)
     
     async def log_warning(self, message: str):
-        """记录警告日志"""
+        """Log a warning message."""
         timestamp = datetime.now()
         filename = f"{timestamp.strftime('%Y_%m_%d_%H_%M_%S')}_warning.json"
         log_data = {
@@ -144,13 +144,13 @@ class RequestLogger:
         await self._write_log_file(filename, log_data)
     
     async def _write_log_file(self, filename: str, log_data: dict):
-        """写入日志文件的辅助方法"""
+        """Helper method to write to a log file."""
         log_path = self.log_dir / filename
         try:
             async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(log_data, ensure_ascii=False, indent=2))
         except Exception as e:
-            print(f"写入日志文件失败: {e}")
+            print(f"Failed to write to log file: {e}")
 
 
 request_logger = RequestLogger()

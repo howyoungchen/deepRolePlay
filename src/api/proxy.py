@@ -36,13 +36,13 @@ router = APIRouter()
 
 
 def _parse_upstream_error(response: httpx.Response) -> Dict[str, Any]:
-    """解析上游服务的错误响应，保持原始格式"""
+    """Parse error response from the upstream service, maintaining the original format."""
     try:
-        # 尝试解析JSON错误响应
+        # Try to parse the JSON error response
         error_data = response.json()
         return error_data
     except (json.JSONDecodeError, ValueError):
-        # 如果不是JSON格式，构造标准错误格式
+        # If not in JSON format, construct a standard error format
         return {
             "error": {
                 "message": response.text or f"HTTP {response.status_code} Error",
@@ -53,18 +53,18 @@ def _parse_upstream_error(response: httpx.Response) -> Dict[str, Any]:
 
 
 def _create_sse_error_chunk(error_data: Dict[str, Any]) -> str:
-    """创建SSE格式的错误chunk"""
+    """Create an SSE-formatted error chunk."""
     return f"data: {json.dumps(error_data)}\n\n"
 
 
 def _check_new_conversation_trigger(messages: List[ChatMessage]) -> bool:
-    """检查是否触发新对话（检查最后两条user消息是否包含deeproleplay关键字）"""
+    """Check if a new conversation is triggered (by checking if 'deeproleplay' is in the last two user messages)."""
     user_messages = [msg for msg in messages if msg.role == "user"]
     
-    # 获取最后两条user消息
+    # Get the last two user messages
     last_two_user_messages = user_messages[-2:] if len(user_messages) >= 2 else user_messages
     
-    # 检查是否包含deeproleplay关键字（不区分大小写）
+    # Check for the 'deeproleplay' keyword (case-insensitive)
     for msg in last_two_user_messages:
         if "deeproleplay" in msg.content.lower():
             return True
@@ -73,28 +73,28 @@ def _check_new_conversation_trigger(messages: List[ChatMessage]) -> bool:
 
 
 def _clear_scenarios_directory():
-    """清理scenarios目录下的所有文件"""
+    """Clean up all files in the scenarios directory."""
     try:
         scenarios_path = os.path.join(os.getcwd(), "scenarios")
         if os.path.exists(scenarios_path):
-            # 获取目录下所有文件
+            # Get all files in the directory
             files = glob.glob(os.path.join(scenarios_path, "*"))
             for file_path in files:
                 if os.path.isfile(file_path):
                     os.remove(file_path)
             return True
     except Exception as e:
-        print(f"清理scenarios目录失败: {e}")
+        print(f"Failed to clear scenarios directory: {e}")
         return False
     return True
 
 
 def _create_new_conversation_response(request_id: str, model: str, stream: bool = False) -> Dict[str, Any]:
-    """创建新对话成功响应"""
-    response_content = "已成功开启新的对话"
+    """Create a success response for a new conversation."""
+    response_content = "A new conversation has been successfully started."
     
     if stream:
-        # 流式响应格式
+        # Streaming response format
         return {
             "id": f"chatcmpl-{request_id}",
             "object": "chat.completion.chunk",
@@ -110,7 +110,7 @@ def _create_new_conversation_response(request_id: str, model: str, stream: bool 
             }]
         }
     else:
-        # 非流式响应格式
+        # Non-streaming response format
         return {
             "id": f"chatcmpl-{request_id}",
             "object": "chat.completion",
@@ -133,25 +133,25 @@ def _create_new_conversation_response(request_id: str, model: str, stream: bool 
 
 
 async def _handle_new_conversation_request(
-    request: Request, 
+    request: Request,
     chat_request: ChatCompletionRequest
 ) -> Union[StreamingResponse, JSONResponse]:
-    """处理新对话请求的完整逻辑"""
-    # 清理scenarios目录
+    """Handle the complete logic for a new conversation request."""
+    # Clean up the scenarios directory
     _clear_scenarios_directory()
     
-    # 生成请求ID用于日志和响应
+    # Generate a request ID for logging and response
     request_id = str(uuid.uuid4())
     
-    # 先生成响应，然后记录日志
+    # Generate the response first, then log it
     if chat_request.stream:
-        # 创建流式响应
+        # Create a streaming response
         response_data = _create_new_conversation_response(request_id, chat_request.model, stream=True)
         
         async def new_conversation_stream():
-            # 发送完整消息
+            # Send the complete message
             yield f"data: {json.dumps(response_data)}\n\n"
-            # 发送结束标记
+            # Send the end-of-stream marker
             yield "data: [DONE]\n\n"
         
         response = StreamingResponse(
@@ -165,19 +165,19 @@ async def _handle_new_conversation_request(
             }
         )
         
-        # 记录新对话触发事件
+        # Log the new conversation trigger event
         await request_logger.log_request_response(
             request=request,
             response=response,
             request_body={"trigger": "new_conversation", "model": chat_request.model},
-            response_body={"message": "新对话已开启", "scenarios_cleared": True, "stream": True},
+            response_body={"message": "New conversation started", "scenarios_cleared": True, "stream": True},
             duration=0.001,
             request_id=request_id
         )
         
         return response
     else:
-        # 创建非流式响应
+        # Create a non-streaming response
         response_data = _create_new_conversation_response(request_id, chat_request.model, stream=False)
         response = JSONResponse(
             content=response_data,
@@ -185,12 +185,12 @@ async def _handle_new_conversation_request(
             headers={"X-Request-ID": request_id, "X-New-Conversation": "true"}
         )
         
-        # 记录新对话触发事件
+        # Log the new conversation trigger event
         await request_logger.log_request_response(
             request=request,
             response=response,
             request_body={"trigger": "new_conversation", "model": chat_request.model},
-            response_body={"message": "新对话已开启", "scenarios_cleared": True, "stream": False},
+            response_body={"message": "New conversation started", "scenarios_cleared": True, "stream": False},
             duration=0.001,
             request_id=request_id
         )
@@ -205,13 +205,13 @@ class ProxyService:
         self.timeout = settings.proxy.timeout
         
     def _get_headers(self, request: Request) -> Dict[str, str]:
-        """获取请求头，从原始请求中提取Authorization头部"""
+        """Get request headers, extracting the Authorization header from the original request."""
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "DeepRolePlay-Proxy/1.0"
         }
         
-        # 从原始请求中提取Authorization头部
+        # Extract the Authorization header from the original request
         auth_header = request.headers.get("authorization")
         if auth_header:
             headers["Authorization"] = auth_header
@@ -219,11 +219,11 @@ class ProxyService:
         return headers
     
     async def _forward_non_streaming(
-        self, 
+        self,
         request: Request,
         request_data: Dict[str, Any]
     ) -> Union[Dict[str, Any], tuple]:
-        """转发非流式请求"""
+        """Forward a non-streaming request."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 self.target_url,
@@ -232,18 +232,18 @@ class ProxyService:
             )
             
             if response.status_code >= 400:
-                # 返回错误数据和状态码
+                # Return error data and status code
                 error_data = _parse_upstream_error(response)
                 return error_data, response.status_code
             
             return response.json()
     
     async def _forward_streaming(
-        self, 
+        self,
         request: Request,
         request_data: Dict[str, Any]
     ) -> AsyncGenerator[Union[str, Dict[str, Any]], None]:
-        """转发流式请求"""
+        """Forward a streaming request."""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             async with client.stream(
                 "POST",
@@ -252,9 +252,9 @@ class ProxyService:
                 json=request_data
             ) as response:
                 if response.status_code >= 400:
-                    # 读取错误响应内容
+                    # Read the error response content
                     error_content = await response.aread()
-                    # 尝试解析为JSON
+                    # Try to parse as JSON
                     try:
                         error_data = json.loads(error_content.decode('utf-8'))
                     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -277,30 +277,30 @@ class ProxyService:
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """转发非流式请求到目标LLM服务"""
+        """Forward a non-streaming request to the target LLM service."""
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
-        # 1. 提取原始消息
+        # 1. Extract original messages
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         
-        # 2. 检查工作流是否启用
+        # 2. Check if the workflow is enabled
         if settings.workflow.enabled:
-            # 工作流启用：执行完整的情景处理流程
-            # 2a. 同步更新情景并获取最新内容
+            # Workflow enabled: execute the full scenario processing flow
+            # 2a. Synchronously update the scenario and get the latest content
             await scenario_manager.update_scenario(original_messages)
             
-            # 3. 读取当前情景内容
+            # 3. Read the current scenario content
             from utils.scenario_utils import read_scenario
             current_scenario = await read_scenario()
             
-            # 4. 将情景注入到消息中
+            # 4. Inject the scenario into the messages
             injected_messages = inject_scenario(original_messages, current_scenario)
         else:
-            # 工作流禁用：直接使用原始消息
+            # Workflow disabled: use the original messages directly
             injected_messages = original_messages
         
-        # 5. 创建请求数据
+        # 5. Create the request data
         request_data = chat_request.model_dump(exclude_none=True)
         request_data["messages"] = injected_messages
         
@@ -319,13 +319,13 @@ class ProxyService:
                 request=request,
                 response=None,
                 request_body=request_data,
-                response_body={"error": f"请求错误: {str(e)}"},
+                response_body={"error": f"Request error: {str(e)}"},
                 duration=duration,
                 request_id=request_id
             )
             raise HTTPException(
                 status_code=502,
-                detail=f"无法连接到上游服务: {str(e)}"
+                detail=f"Could not connect to the upstream service: {str(e)}"
             )
     
     async def _handle_non_streaming_request(
@@ -335,11 +335,11 @@ class ProxyService:
         request_id: str,
         start_time: float
     ):
-        """处理非流式请求"""
+        """Handle a non-streaming request."""
         result = await self._forward_non_streaming(request, request_data)
         duration = time.time() - start_time
         
-        # 检查是否为错误响应
+        # Check if it is an error response
         if isinstance(result, tuple):
             error_data, status_code = result
             response = JSONResponse(content=error_data, status_code=status_code)
@@ -355,7 +355,7 @@ class ProxyService:
             
             return response
         else:
-            # 正常响应
+            # Normal response
             response_data = result
             response = JSONResponse(content=response_data)
             
@@ -371,7 +371,7 @@ class ProxyService:
             return response
     
     def _parse_streaming_response(self, raw_chunks: List[str]) -> Dict[str, Any]:
-        """解析流式响应，提取最终结果"""
+        """Parse the streaming response to extract the final result."""
         content_parts = []
         reasoning_parts = []
         final_data = None
@@ -380,7 +380,7 @@ class ProxyService:
             lines = chunk.strip().split('\n')
             for line in lines:
                 if line.startswith('data: '):
-                    data_str = line[6:]  # 去掉 'data: ' 前缀
+                    data_str = line[6:]  # Remove the 'data: ' prefix
                     if data_str == '[DONE]':
                         continue
                     try:
@@ -391,11 +391,11 @@ class ProxyService:
                                 content_parts.append(delta['content'])
                             if 'reasoning_content' in delta and delta['reasoning_content']:
                                 reasoning_parts.append(delta['reasoning_content'])
-                            final_data = data  # 保存最后一个有效的数据结构
+                            final_data = data  # Save the last valid data structure
                     except json.JSONDecodeError:
                         continue
         
-        # 构造最终响应
+        # Construct the final response
         final_response = {
             "id": final_data.get('id', '') if final_data else '',
             "object": "chat.completion",
@@ -412,7 +412,7 @@ class ProxyService:
             "usage": {"prompt_tokens": 0, "completion_tokens": len(content_parts), "total_tokens": len(content_parts)}
         }
         
-        # 如果有推理内容，添加到响应中
+        # If there is reasoning content, add it to the response
         if reasoning_parts:
             final_response["reasoning_content"] = "".join(reasoning_parts)
         
@@ -425,20 +425,20 @@ class ProxyService:
         request_id: str,
         start_time: float
     ):
-        """处理流式请求"""
+        """Handle a streaming request."""
         chunks_count = 0
-        collected_chunks = []  # 只用于日志记录
+        collected_chunks = []  # Used only for logging
         
         async def stream_generator():
             nonlocal chunks_count, collected_chunks
             try:
                 async for chunk in self._forward_streaming(request, request_data):
-                    # 检查是否为错误响应
+                    # Check for an error response
                     if isinstance(chunk, dict) and chunk.get("error"):
                         error_data = chunk["data"]
                         error_chunk = _create_sse_error_chunk(error_data)
                         yield error_chunk
-                        # 记录错误到日志
+                        # Log the error
                         await request_logger.log_streaming_request(
                             request=request,
                             request_body=request_data,
@@ -451,8 +451,8 @@ class ProxyService:
                         return
                     
                     chunks_count += 1
-                    # 只在需要日志时收集chunks，立即转发
-                    if chunks_count <= 1000:  # 限制收集数量，避免内存问题
+                    # Collect chunks only when needed for logging, forward immediately
+                    if chunks_count <= 1000:  # Limit collection to avoid memory issues
                         collected_chunks.append(chunk)
                     yield chunk
             except Exception as e:
@@ -467,7 +467,7 @@ class ProxyService:
                 yield error_chunk
             finally:
                 duration = time.time() - start_time
-                # 解析流式响应得到最终结果（用于日志）
+                # Parse the streaming response to get the final result (for logging)
                 final_response = self._parse_streaming_response(collected_chunks)
                 await request_logger.log_streaming_request(
                     request=request,
@@ -494,28 +494,28 @@ class ProxyService:
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """转发流式请求（包含工作流流式输出）"""
+        """Forward a streaming request (including workflow streaming output)."""
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
-        # 1. 提取原始消息
+        # 1. Extract original messages
         original_messages = [msg.model_dump() for msg in chat_request.messages]
         
         chunks_count = 0
         collected_chunks = []
         
-        # 将 request_data 初始化提前，以便在 finally 中访问
+        # Initialize request_data early so it can be accessed in the finally block
         request_data = chat_request.model_dump(exclude_none=True)
-        # 先用原始消息填充，如果后续步骤失败，也能记录原始请求
+        # Pre-fill with original messages to log the original request if subsequent steps fail
         request_data["messages"] = original_messages
         
         async def workflow_streaming_generator():
             nonlocal chunks_count, collected_chunks, request_data
             
             try:
-                # 2. 检查工作流是否启用
+                # 2. Check if the workflow is enabled
                 if settings.workflow.enabled:
-                    # 工作流启用：先流式输出工作流事件
+                    # Workflow enabled: first, stream workflow events
                     from utils.stream_converter import WorkflowStreamConverter
                     converter = WorkflowStreamConverter(request_id)
                     
@@ -524,27 +524,27 @@ class ProxyService:
                     async for sse_chunk in converter.convert_workflow_events(workflow_events):
                         yield sse_chunk
                     
-                    # 3. 工作流完成后，读取更新的情景内容
+                    # 3. After the workflow completes, read the updated scenario content
                     from utils.scenario_utils import read_scenario
                     current_scenario = await read_scenario()
                     
-                    # 4. 将情景注入到消息中
+                    # 4. Inject the scenario into the messages
                     injected_messages = inject_scenario(original_messages, current_scenario)
                 else:
-                    # 工作流禁用：直接使用原始消息
+                    # Workflow disabled: use the original messages directly
                     injected_messages = original_messages
                 
-                # 5. 更新 request_data 中的 messages
+                # 5. Update messages in request_data
                 request_data["messages"] = injected_messages
                 
-                # 6. 流式输出LLM响应
+                # 6. Stream the LLM response
                 async for llm_chunk in self._forward_streaming(request, request_data):
-                    # 检查是否为错误响应
+                    # Check for an error response
                     if isinstance(llm_chunk, dict) and llm_chunk.get("error"):
                         error_data = llm_chunk["data"]
                         error_chunk = _create_sse_error_chunk(error_data)
                         yield error_chunk
-                        # 记录错误到日志
+                        # Log the error
                         await request_logger.log_streaming_request(
                             request=request,
                             request_body=request_data,
@@ -557,14 +557,14 @@ class ProxyService:
                         return
                     
                     chunks_count += 1
-                    # 只在需要日志时收集chunks，立即转发
-                    if chunks_count <= 1000:  # 限制收集数量，避免内存问题
+                    # Collect chunks only when needed for logging, forward immediately
+                    if chunks_count <= 1000:  # Limit collection to avoid memory issues
                         collected_chunks.append(llm_chunk)
                     yield llm_chunk
                     
             except Exception as e:
-                # 区分工作流错误和LLM转发错误
-                error_message = f"工作流执行失败: {str(e)}" if "workflow" in str(e).lower() else f"LLM服务错误: {str(e)}"
+                # Differentiate between workflow errors and LLM forwarding errors
+                error_message = f"Workflow execution failed: {str(e)}" if "workflow" in str(e).lower() else f"LLM service error: {str(e)}"
                 error_data = {
                     "error": {
                         "message": error_message,
@@ -576,10 +576,10 @@ class ProxyService:
                 yield error_chunk
             finally:
                 duration = time.time() - start_time
-                # 解析流式响应得到最终结果（用于日志）
+                # Parse the streaming response to get the final result (for logging)
                 final_response = self._parse_streaming_response(collected_chunks)
                 
-                # 使用更新后的 request_data 记录日志
+                # Log using the updated request_data
                 await request_logger.log_streaming_request(
                     request=request,
                     request_body=request_data,
@@ -602,7 +602,7 @@ class ProxyService:
         )
     
     async def forward_models_request(self, request: Request):
-        """转发models查询请求到目标LLM服务"""
+        """Forward a models query request to the target LLM service."""
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
@@ -616,7 +616,7 @@ class ProxyService:
                 duration = time.time() - start_time
                 
                 if response.status_code >= 400:
-                    # 处理错误响应
+                    # Handle error response
                     error_data = _parse_upstream_error(response)
                     json_response = JSONResponse(content=error_data, status_code=response.status_code)
                     
@@ -631,7 +631,7 @@ class ProxyService:
                     
                     return json_response
                 else:
-                    # 正常响应
+                    # Normal response
                     response_data = response.json()
                     json_response = JSONResponse(content=response_data)
                     
@@ -648,7 +648,7 @@ class ProxyService:
                     
         except httpx.RequestError as e:
             duration = time.time() - start_time
-            error_data = {"error": f"请求错误: {str(e)}"}
+            error_data = {"error": f"Request error: {str(e)}"}
             
             await request_logger.log_request_response(
                 request=request,
@@ -661,7 +661,7 @@ class ProxyService:
             
             raise HTTPException(
                 status_code=502,
-                detail=f"无法连接到上游服务: {str(e)}"
+                detail=f"Could not connect to the upstream service: {str(e)}"
             )
 
 
@@ -670,28 +670,28 @@ proxy_service = ProxyService()
 
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
-    """OpenAI兼容的聊天完成接口"""
+    """OpenAI-compatible chat completion endpoint."""
     
-    # 检查是否触发新对话
+    # Check if a new conversation is triggered
     if _check_new_conversation_trigger(chat_request.messages):
         return await _handle_new_conversation_request(request, chat_request)
     
-    # 正常处理流程
+    # Normal processing flow
     if chat_request.stream:
-        # 流式请求：包含工作流流式输出
+        # Streaming request: includes workflow streaming output
         return await proxy_service.forward_streaming_request(request, chat_request)
     else:
-        # 非流式请求：传统的同步工作流处理
+        # Non-streaming request: traditional synchronous workflow processing
         return await proxy_service.forward_non_streaming_request(request, chat_request)
 
 
 @router.get("/health")
 async def health_check():
-    """健康检查接口"""
+    """Health check endpoint."""
     return {"status": "healthy", "version": "1.0.0"}
 
 
 @router.get("/v1/models")
 async def list_models(request: Request):
-    """OpenAI兼容的模型列表查询接口"""
+    """OpenAI-compatible model listing endpoint."""
     return await proxy_service.forward_models_request(request)

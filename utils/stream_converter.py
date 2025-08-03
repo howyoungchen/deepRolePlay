@@ -1,6 +1,6 @@
 """
-流式事件转换工具
-将LangGraph工作流事件转换为OpenAI兼容的SSE格式
+Streaming Event Conversion Tool
+Converts LangGraph workflow events to OpenAI-compatible SSE format
 """
 import json
 import time
@@ -9,7 +9,7 @@ from typing import Dict, Any, AsyncGenerator
 
 
 class WorkflowStreamConverter:
-    """工作流流式事件转换器"""
+    """Workflow Streaming Event Converter"""
     
     def __init__(self, request_id: str = None):
         self.request_id = request_id or str(uuid.uuid4())
@@ -18,7 +18,7 @@ class WorkflowStreamConverter:
         self.ai_message_started = False
     
     def create_sse_data(self, content: str, event_type: str = "workflow") -> str:
-        """创建SSE格式的数据"""
+        """Create SSE formatted data"""
         chunk_data = {
             "id": f"chatcmpl-{self.request_id}",
             "object": "chat.completion.chunk",
@@ -38,7 +38,7 @@ class WorkflowStreamConverter:
         return f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
     
     def create_workflow_done_event(self) -> str:
-        """创建工作流完成事件"""
+        """Create workflow completion event"""
         chunk_data = {
             "id": f"chatcmpl-{self.request_id}",
             "object": "chat.completion.chunk", 
@@ -55,79 +55,79 @@ class WorkflowStreamConverter:
         return f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
     
     async def convert_workflow_events(
-        self, 
+        self,
         workflow_events: AsyncGenerator[Dict[str, Any], None]
     ) -> AsyncGenerator[str, None]:
         """
-        转换工作流事件为SSE流
+        Convert workflow events to an SSE stream
         
         Args:
-            workflow_events: 工作流事件异步生成器
+            workflow_events: Asynchronous generator for workflow events
             
         Yields:
-            SSE格式的字符串
+            SSE formatted string
         """
         try:
-            # 发送工作流开始事件
-            yield self.create_sse_data("🔄 开始更新情景...\n\n", "workflow_start")
+            # Send workflow start event
+            yield self.create_sse_data("🔄 Starting to update scenario...\n\n", "workflow_start")
             
             async for event in workflow_events:
                 sse_chunk = self._process_event(event)
                 if sse_chunk:
                     yield sse_chunk
             
-            # 发送工作流完成事件
-            yield self.create_sse_data("\n✅ 情景更新完成，开始生成回复...\n\n", "workflow_end")
+            # Send workflow completion event
+            yield self.create_sse_data("\n✅ Scenario update complete, starting to generate response...\n\n", "workflow_end")
             yield self.create_workflow_done_event()
             
         except Exception as e:
-            error_msg = f"❌ 工作流执行出错: {str(e)}\n\n"
+            error_msg = f"❌ Error executing workflow: {str(e)}\n\n"
             yield self.create_sse_data(error_msg, "workflow_error")
             yield self.create_workflow_done_event()
     
     def _process_event(self, event: Dict[str, Any]) -> str:
-        """处理单个工作流事件"""
+        """Process a single workflow event"""
         event_type = event.get("event", "unknown")
         name = event.get("name", "")
         data = event.get("data", {})
         
-        # 节点开始
+        # Node start
         if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater"]:
             self.current_node = name
             node_name_map = {
-                "memory_flashback": "记忆闪回",
-                "scenario_updater": "情景更新"
+                "memory_flashback": "Memory Flashback",
+                "scenario_updater": "Scenario Updater"
             }
-            content = f"🔄 开始执行 {node_name_map.get(name, name)} 节点...\n"
+            content = f"🔄 Starting node {node_name_map.get(name, name)}...\n"
             return self.create_sse_data(content, "node_start")
         
-        # AI消息流式输出
+        # AI message stream output
         if event_type == "on_chat_model_stream" and self.current_node:
             chunk = data.get("chunk", {})
             if hasattr(chunk, 'content') and chunk.content:
                 if not self.ai_message_started:
                     self.ai_message_started = True
-                    header = f"\n💭 {self.current_node} 思考中:\n"
+                    header = f"\n💭 {self.current_node} thinking:\n"
                     return self.create_sse_data(header, "ai_thinking")
                 
-                # 直接转发，不缓冲
+                # Forward directly, no buffering
                 return self.create_sse_data(chunk.content, "ai_content")
         
-        # AI消息结束
+        # AI message end
         if event_type == "on_chat_model_end" and self.current_node and self.ai_message_started:
             self.ai_message_started = False
             return self.create_sse_data("\n", "ai_end")
         
-        # 工具调用开始
+        # Tool call start
         if event_type == "on_tool_start" and self.current_node:
             tool_name = name
             tool_input = data.get("input", {})
             
-            content = f"\n🔧 调用工具: {tool_name}\n"
+            content = f"\n🔧 Calling tool: {tool_name}\n"
             if tool_input:
-                content += "参数:\n"
+                content += "Arguments:\n"
                 for key, value in tool_input.items():
-                    # 截断长内容
+                    # Truncate long content
                     if isinstance(value, str) and len(value) > 100:
                         value = value[:100] + "..."
                     content += f"  {key}: {value}\n"
@@ -135,31 +135,31 @@ class WorkflowStreamConverter:
             
             return self.create_sse_data(content, "tool_start")
         
-        # 工具调用结束
+        # Tool call end
         if event_type == "on_tool_end" and self.current_node:
             tool_name = name
             tool_output = data.get("output", "")
             
-            content = f"✅ 工具 {tool_name} 执行完成\n"
+            content = f"✅ Tool {tool_name} execution complete\n"
             if isinstance(tool_output, str):
                 if len(tool_output) > 200:
-                    content += f"输出: {tool_output[:200]}...\n"
+                    content += f"Output: {tool_output[:200]}...\n"
                 else:
-                    content += f"输出: {tool_output}\n"
+                    content += f"Output: {tool_output}\n"
             content += "\n"
             
             return self.create_sse_data(content, "tool_end")
         
-        # 节点完成
+        # Node complete
         if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater"]:
             node_output = data.get("output", {})
             
             node_name_map = {
-                "memory_flashback": "记忆闪回",
-                "scenario_updater": "情景更新"
+                "memory_flashback": "Memory Flashback",
+                "scenario_updater": "Scenario Updater"
             }
             
-            content = f"✅ {node_name_map.get(name, name)} 节点完成\n"
+            content = f"✅ Node {node_name_map.get(name, name)} complete\n"
             for key, value in node_output.items():
                 if isinstance(value, str) and len(value) > 100:
                     content += f"  {key}: {value[:100]}...\n"
@@ -179,22 +179,22 @@ async def create_unified_stream(
     request_id: str = None
 ) -> AsyncGenerator[str, None]:
     """
-    创建统一的流式输出，合并工作流事件和LLM响应
+    Create a unified stream, merging workflow events and LLM response
     
     Args:
-        workflow_events: 工作流事件流
-        llm_stream: LLM响应流  
-        request_id: 请求ID
+        workflow_events: Workflow event stream
+        llm_stream: LLM response stream
+        request_id: Request ID
         
     Yields:
-        统一的SSE格式流
+        Unified SSE formatted stream
     """
     converter = WorkflowStreamConverter(request_id)
     
-    # 先输出工作流事件
+    # First, output workflow events
     async for sse_chunk in converter.convert_workflow_events(workflow_events):
         yield sse_chunk
     
-    # 再输出LLM响应
+    # Then, output the LLM response
     async for llm_chunk in llm_stream:
         yield llm_chunk

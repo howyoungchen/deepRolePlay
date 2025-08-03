@@ -15,20 +15,20 @@ class WorkflowLogger:
         
     async def log_agent_execution(
         self,
-        node_type: str,  # "memory_flashback" 或 "scenario_updater"
+        node_type: str,  # "memory_flashback" or "scenario_updater"
         inputs: Dict[str, Any],
         agent_response: Dict[str, Any],
         outputs: Dict[str, Any],
         duration: float,
         execution_id: str = None
     ):
-        """记录智能体的完整执行过程"""
+        """Logs the complete execution process of the agent."""
         if execution_id is None:
             execution_id = str(uuid.uuid4())
         
         timestamp = datetime.now()
         
-        # 解析agent响应中的关键信息
+        # Parse key information from the agent response
         parsed_response = self._parse_agent_response(agent_response)
         
         log_data = {
@@ -44,20 +44,20 @@ class WorkflowLogger:
             "status": "success" if outputs else "failed"
         }
         
-        # 文件命名格式：YYYY_MM_DD_HH_MM_SS_{node_type}.json
+        # File naming format: YYYY_MM_DD_HH_MM_SS_{node_type}.json
         log_filename = timestamp.strftime(f"%Y_%m_%d_%H_%M_%S_{node_type}.json")
         log_path = self.log_dir / log_filename
         
         try:
-            # 确保日志目录存在
+            # Ensure the log directory exists
             log_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(log_data, ensure_ascii=False, indent=2))
         except Exception as e:
-            print(f"写入工作流日志文件失败: {e}")
+            print(f"Failed to write to workflow log file: {e}")
     
     def _parse_agent_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
-        """解析agent响应，提取关键信息"""
+        """Parses the agent response to extract key information."""
         parsed = {
             "messages_full": []
         }
@@ -66,7 +66,7 @@ class WorkflowLogger:
             messages = response.get("messages", [])
             
             if messages:
-                # 保存完整的消息内容
+                # Save the full message content
                 for i, msg in enumerate(messages):
                     msg_data = {
                         "index": i,
@@ -78,7 +78,7 @@ class WorkflowLogger:
                         "tool_call_id": ""
                     }
                     
-                    # 提取消息内容和角色
+                    # Extract message content and role
                     if hasattr(msg, 'content'):
                         msg_data["content"] = str(msg.content)
                     elif isinstance(msg, dict):
@@ -99,7 +99,7 @@ class WorkflowLogger:
                     elif isinstance(msg, dict):
                         msg_data["tool_call_id"] = str(msg.get("tool_call_id", ""))
                     
-                    # 提取工具调用信息
+                    # Extract tool call information
                     if hasattr(msg, 'tool_calls') and msg.tool_calls:
                         for tool_call in msg.tool_calls:
                             tool_data = {
@@ -132,7 +132,7 @@ class WorkflowLogger:
         error_details: str = "",
         execution_id: str = None
     ):
-        """记录执行错误"""
+        """Logs an execution error."""
         if execution_id is None:
             execution_id = str(uuid.uuid4())
         
@@ -155,13 +155,13 @@ class WorkflowLogger:
         log_path = self.log_dir / log_filename
         
         try:
-            # 确保日志目录存在
+            # Ensure the log directory exists
             log_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(log_data, ensure_ascii=False, indent=2))
         except Exception as e:
-            print(f"写入工作流错误日志文件失败: {e}")
+            print(f"Failed to write to workflow error log file: {e}")
 
 
-# 创建全局工作流日志实例
+# Create a global workflow logger instance
 workflow_logger = WorkflowLogger()

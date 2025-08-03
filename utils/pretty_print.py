@@ -1,20 +1,20 @@
 """
-美化输出工具，支持LangGraph流式事件的美化显示
+Pretty print tool, supports formatted display of LangGraph stream events
 """
 
 
 def pretty_print_stream_events(event):
     """
-    美化打印LangGraph流式事件
+    Pretty prints LangGraph stream events.
     
     Args:
-        event: 来自 astream_events 的事件字典
+        event: The event dictionary from astream_events.
     """
     event_type = event.get("event", "unknown")
     name = event.get("name", "")
     data = event.get("data", {})
     
-    # 全局状态追踪（使用函数属性）
+    # Global state tracking (using function attributes)
     if not hasattr(pretty_print_stream_events, 'current_node'):
         pretty_print_stream_events.current_node = None
     if not hasattr(pretty_print_stream_events, 'message_buffer'):
@@ -22,14 +22,14 @@ def pretty_print_stream_events(event):
     if not hasattr(pretty_print_stream_events, 'ai_message_started'):
         pretty_print_stream_events.ai_message_started = False
     
-    # 检测节点开始
+    # Detect node start
     if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater"]:
         pretty_print_stream_events.current_node = name
         print(f"\n🔄 Update from node {name}:")
         print()
         return
     
-    # 处理AI消息流式输出
+    # Handle AI message stream output
     if event_type == "on_chat_model_stream" and pretty_print_stream_events.current_node:
         chunk = data.get("chunk", {})
         if hasattr(chunk, 'content') and chunk.content:
@@ -38,12 +38,12 @@ def pretty_print_stream_events(event):
                 print(f"Name: {pretty_print_stream_events.current_node}_agent")
                 pretty_print_stream_events.ai_message_started = True
             
-            # 累积消息内容
+            # Accumulate message content
             pretty_print_stream_events.message_buffer += chunk.content
             print(chunk.content, end="", flush=True)
         return
     
-    # AI消息结束时换行
+    # Newline at the end of the AI message
     if event_type == "on_chat_model_end" and pretty_print_stream_events.current_node:
         if pretty_print_stream_events.ai_message_started:
             print("\n")
@@ -51,12 +51,12 @@ def pretty_print_stream_events(event):
             pretty_print_stream_events.message_buffer = ""
         return
     
-    # 检测工具调用开始
+    # Detect tool call start
     if event_type == "on_tool_start" and pretty_print_stream_events.current_node:
         tool_name = name
         tool_input = data.get("input", {})
         
-        # 如果有AI消息缓冲，先结束它
+        # If there is an AI message buffer, end it first
         if pretty_print_stream_events.ai_message_started:
             print("\n")
             pretty_print_stream_events.ai_message_started = False
@@ -70,7 +70,7 @@ def pretty_print_stream_events(event):
         print()
         return
     
-    # 检测工具调用结束
+    # Detect tool call end
     if event_type == "on_tool_end" and pretty_print_stream_events.current_node:
         tool_name = name
         tool_output = data.get("output", "")
@@ -83,7 +83,7 @@ def pretty_print_stream_events(event):
         
         if isinstance(tool_output, str):
             if len(tool_output) > 500:
-                print(f"{tool_output[:500]}... (已截断)")
+                print(f"{tool_output[:500]}... (truncated)")
             else:
                 print(tool_output)
         else:
@@ -91,11 +91,11 @@ def pretty_print_stream_events(event):
         print()
         return
     
-    # 检测节点完成
+    # Detect node completion
     if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater"]:
         node_output = data.get("output", {})
         
-        # 如果有AI消息缓冲，先结束它
+        # If there is an AI message buffer, end it first
         if pretty_print_stream_events.ai_message_started:
             print("\n")
             pretty_print_stream_events.ai_message_started = False
@@ -103,7 +103,7 @@ def pretty_print_stream_events(event):
         print(f"✅ Node {name} completed:")
         for key, value in node_output.items():
             if isinstance(value, str) and len(value) > 100:
-                print(f"  {key}: {value[:100]}... (已截断)")
+                print(f"  {key}: {value[:100]}... (truncated)")
             else:
                 print(f"  {key}: {value}")
         print("-" * 80)
