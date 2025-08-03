@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-这是一个基于FastAPI的AI角色扮演代理系统，使用LangGraph工作流管理情景更新和记忆闪回功能。系统提供OpenAI兼容的HTTP代理服务，在LLM请求前自动更新角色情景。
+DeepRolePlay是一个基于FastAPI的AI角色扮演代理系统，使用LangGraph工作流管理情景更新和记忆闪回功能。系统提供OpenAI兼容的HTTP代理服务，通过多智能体架构解决角色遗忘问题。
 
 ## 核心架构
 
@@ -14,12 +14,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **HTTP客户端**: httpx
 - **配置管理**: Pydantic + PyYAML
 - **外部知识**: Wikipedia API
+- **Python版本**: 3.12
 
 ### 关键执行流程
 
 1. **请求代理流程**: HTTP请求 → 情景注入 (`utils/messages_process.py`) → 工作流执行 → 目标API调用 → 响应返回
 2. **工作流执行**: 记忆闪回节点 → 情景更新节点 → 文件写入
 3. **配置加载**: 支持命令行参数 `--config_path` 指定配置文件路径
+4. **端口管理**: 自动检测端口占用，从配置端口开始递增查找可用端口（最多尝试20个）
 
 ### 主要组件
 
@@ -27,6 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - OpenAI兼容的 `/v1/chat/completions` 接口
    - ProxyService类处理转发逻辑，支持流式和非流式响应
    - 自动调用scenario_manager执行工作流
+   - 处理API密钥转发和请求头管理
 
 2. **工作流系统** (`src/workflow/graph/scenario_workflow.py`)
    - ParentState状态管理，包含messages、current_scenario、memory_flashback
@@ -37,11 +40,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **情景管理** (`src/scenario/manager.py`)
    - ScenarioManager协调工作流执行
    - 支持流式事件输出到前端
+   - 管理scenario文件的读写操作
 
 4. **配置系统** (`config/manager.py`)
    - 基于Pydantic的配置管理
    - 支持YAML文件和命令行参数
    - ProxyConfig、AgentConfig、LangGraphConfig等结构化配置
+   - 支持从当前目录或指定路径加载配置
 
 ## 常用命令
 
@@ -79,7 +84,7 @@ python src/workflow/graph/scenario_workflow.py
 ```bash
 # 测试记忆闪回Agent（需要先配置API密钥）
 PYTHONPATH=. python -c "
-from src.workflow.graph.scenario_workflow import MemoryFlashbackAgent
+from src.workflow.graph.scenario_updater import MemoryFlashbackAgent
 import asyncio
 
 async def test_memory_only():
@@ -102,6 +107,12 @@ asyncio.run(test_memory_only())
 ### 指定配置文件启动
 ```bash
 python main.py --config_path /path/to/config.yaml
+```
+
+### 打包为可执行文件
+```bash
+# 使用PyInstaller打包
+pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" main.py
 ```
 
 ## 配置文件结构
@@ -155,3 +166,24 @@ agent:
 system:
   log_level: "DEBUG"  # INFO, DEBUG, WARNING, ERROR
 ```
+
+## 项目特性
+
+### API兼容性
+- 完全兼容OpenAI Chat Completions API格式
+- 支持流式(SSE)和非流式响应
+- 自动处理API密钥转发
+- 支持所有OpenAI兼容的模型服务商
+
+### 工作流工具
+- **思考工具** (`sequential_thinking.py`): 顺序思考和推理
+- **搜索工具** (`re_search_tool.py`): 基于正则的内容搜索
+- **读取工具** (`read_tool.py`): 文件读取操作
+- **写入工具** (`write_tool.py`): 文件写入操作
+- **编辑工具** (`edit_tool.py`): 文件编辑操作
+
+### 错误处理
+- 自动端口递增机制，避免端口冲突
+- 详细的错误日志记录（JSON格式）
+- 工作流执行异常捕获和处理
+- HTTP请求超时和重试机制

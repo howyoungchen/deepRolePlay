@@ -17,7 +17,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI
 
 from config.manager import settings
-from utils.logger import request_logger
+from utils.workflow_logger import workflow_logger
 from src.prompts.memory_flashback_prompts import MEMORY_FLASHBACK_PROMPT, MEMORY_FLASHBACK_USER_TEMPLATE
 from src.prompts.scenario_updater_prompts import SCENARIO_UPDATER_PROMPT, SCENARIO_UPDATER_USER_TEMPLATE
 from src.workflow.tools.sequential_thinking import sequential_thinking
@@ -109,7 +109,7 @@ def extract_memory_flashback_result(response: Dict[str, Any]) -> str:
         return "<记忆闪回>\n暂无相关历史记忆。\n</记忆闪回>"
         
     except Exception as e:
-        request_logger.log_error(f"提取记忆闪回结果失败: {str(e)}")
+        print(f"提取记忆闪回结果失败: {str(e)}")
         return "<记忆闪回>\n记忆搜索出现错误，无法获取历史信息。\n</记忆闪回>"
 
 
@@ -119,17 +119,23 @@ def extract_memory_flashback_result(response: Dict[str, Any]) -> str:
 
 async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
     """记忆闪回节点函数"""
+    import time
+    start_time = time.time()
+    
+    # 准备输入数据
+    messages = state.get("messages", [])
+    langgraph_config = settings.langgraph
+    offset = langgraph_config.history_ai_message_offset
+    last_ai_message = extract_latest_ai_message(messages, offset)
+    
+    inputs = {
+        "current_scenario": state.get("current_scenario", ""),
+        "messages_count": len(messages),
+        "last_ai_message_length": len(last_ai_message),
+        "history_offset": offset
+    }
+    
     try:
-        # ================ 提取和准备数据 ================
-        messages = state.get("messages", [])
-        langgraph_config = settings.langgraph
-        offset = langgraph_config.history_ai_message_offset
-        last_ai_message = extract_latest_ai_message(messages, offset)
-        
-        await request_logger.log_info(
-            f"开始记忆闪回，提取的AI消息长度: {len(last_ai_message)}"
-        )
-        
         # ================ 创建模型和代理 ================
         wikipedia_tool = create_wikipedia_tool()
         model = create_model()
@@ -156,11 +162,22 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
         
         # ================ 提取和处理结果 ================
         memory_result = extract_memory_flashback_result(response)
+        duration = time.time() - start_time
         
-        if memory_result:
-            await request_logger.log_info(f"记忆闪回成功，结果长度: {len(memory_result)}")
-        else:
-            await request_logger.log_warning("记忆闪回未产生有效结果")
+        outputs = {
+            "memory_flashback": memory_result,
+            "last_ai_message": last_ai_message,
+            "result_length": len(memory_result) if memory_result else 0
+        }
+        
+        # 记录工作流日志
+        await workflow_logger.log_agent_execution(
+            node_type="memory_flashback",
+            inputs=inputs,
+            agent_response=response,
+            outputs=outputs,
+            duration=duration
+        )
         
         return {
             "memory_flashback": memory_result,
@@ -170,7 +187,16 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        await request_logger.log_error(f"记忆闪回节点执行失败: {str(e)}\n详细错误:\n{error_details}")
+        duration = time.time() - start_time
+        
+        # 记录错误日志
+        await workflow_logger.log_execution_error(
+            node_type="memory_flashback",
+            inputs=inputs,
+            error_message=str(e),
+            error_details=error_details
+        )
+        
         return {
             "memory_flashback": "=== 记忆闪回 ===\n\n记忆搜索出现错误，无法获取历史信息。",
             "last_ai_message": ""
@@ -179,15 +205,24 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
 
 async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
     """情景更新节点函数"""
+    import time
+    start_time = time.time()
+    
+    # 准备输入数据
+    current_scenario = state.get("current_scenario", "")
+    last_ai_message = state.get("last_ai_message", "")
+    memory_flashback = state.get("memory_flashback", "")
+    
+    inputs = {
+        "current_scenario_length": len(current_scenario),
+        "last_ai_message_length": len(last_ai_message),
+        "memory_flashback_length": len(memory_flashback),
+        "scenario_exists": bool(current_scenario and current_scenario.strip())
+    }
+    
+    print(f"开始情景更新，当前情景长度: {len(current_scenario)}, AI消息长度: {len(last_ai_message)}, 记忆闪回长度: {len(memory_flashback)}")
+    
     try:
-        # ================ 提取和准备数据 ================
-        current_scenario = state.get("current_scenario", "")
-        last_ai_message = state.get("last_ai_message", "")
-        memory_flashback = state.get("memory_flashback", "")
-        
-        await request_logger.log_info(
-            f"开始情景更新，当前情景长度: {len(current_scenario)}, AI消息长度: {len(last_ai_message)}, 记忆闪回长度: {len(memory_flashback)}"
-        )
         
         # ================ 创建模型和代理 ================
         model = create_model()
@@ -212,7 +247,7 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
         )
         
         # ================ 调用代理执行情景更新 ================
-        await agent.ainvoke({
+        response = await agent.ainvoke({
             "messages": [{"role": "user", "content": user_prompt}]
         })
         
@@ -222,16 +257,44 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
         await asyncio.sleep(0.5)
         scenario_result = await read_scenario()
         
+        duration = time.time() - start_time
+        
+        outputs = {
+            "final_scenario_length": len(scenario_result) if scenario_result else 0,
+            "update_successful": bool(scenario_result and scenario_result.strip())
+        }
+        
         if scenario_result and scenario_result.strip():
-            await request_logger.log_info(f"情景更新成功，结果长度: {len(scenario_result)}")
+            print(f"情景更新成功，结果长度: {len(scenario_result)}")
         else:
-            await request_logger.log_warning("情景更新未产生有效结果")
+            print("情景更新未产生有效结果")
             scenario_result = "情景更新失败"
+        
+        # 记录工作流日志
+        await workflow_logger.log_agent_execution(
+            node_type="scenario_updater",
+            inputs=inputs,
+            agent_response=response,
+            outputs=outputs,
+            duration=duration
+        )
         
         return {"final_scenario": scenario_result}
         
     except Exception as e:
-        await request_logger.log_error(f"情景更新节点执行失败: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        duration = time.time() - start_time
+        
+        # 记录错误日志
+        await workflow_logger.log_execution_error(
+            node_type="scenario_updater",
+            inputs=inputs,
+            error_message=str(e),
+            error_details=error_details
+        )
+        
+        print(f"情景更新节点执行失败: {str(e)}")
         return {"final_scenario": "情景更新失败"}
 
 
