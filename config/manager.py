@@ -10,7 +10,7 @@ from typing import Optional, List
 
 class ProxyConfig(BaseModel):
     target_url: str = "https://api.openai.com/v1/chat/completions"
-    api_key: str = "sk-your-api-key-here"
+    api_key: Optional[str] = None  # API密钥从前端请求中获取，不再需要配置
     timeout: int = 30
 
 
@@ -87,16 +87,21 @@ class Settings(BaseSettings):
                 # 如果命令行参数提供了路径，则使用该路径
                 yaml_path = args.config_path
             else:
-                # 否则，使用默认路径
-                # 判断是否是打包环境
-                if getattr(sys, 'frozen', False):
-                    # 打包后的exe所在目录
-                    base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(sys.executable).parent
+                # 1. 优先检查当前运行目录下的 config.yaml
+                current_dir_config = Path.cwd() / "config.yaml"
+                if current_dir_config.exists():
+                    yaml_path = current_dir_config
                 else:
-                    # 脚本运行环境
-                    base_path = Path(__file__).parent.parent
-                
-                yaml_path = base_path / "config" / "config.yaml"
+                    # 2. 回退到项目目录下的 config/config.yaml
+                    # 判断是否是打包环境
+                    if getattr(sys, 'frozen', False):
+                        # 打包后的exe所在目录
+                        base_path = Path(sys._MEIPASS) if hasattr(sys, '_MEIPASS') else Path(sys.executable).parent
+                    else:
+                        # 脚本运行环境
+                        base_path = Path(__file__).parent.parent
+                    
+                    yaml_path = base_path / "config" / "config.yaml"
 
         config_path = Path(yaml_path)
         if not config_path.exists():

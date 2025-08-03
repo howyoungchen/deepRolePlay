@@ -10,6 +10,8 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 
 ## 🚀 解决角色扮演核心痛点
 
+<img src="pics/generate.png" alt="DeepRolePlay演示" width="150">
+
 ### 😤 你是否遇到过这些问题？
 - 🤖 **AI 突然忘记角色设定**：明明是法师却拿起了剑
 - 📖 **剧情前后不一致**：昨天的重要情节今天完全不记得
@@ -21,29 +23,56 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 - 💰 **成本可控**：情景压缩技术，长对话费用降低 80%
 - 📚 **智能联网**：集成 Wikipedia 百科，免费自动补全角色背景和故事设定
 - ⚡ **即插即用**：5分钟集成，SillyTavern 等平台直接使用
-
-### ⚖️ 权衡与缺点
-
-为了实现以上效果，本项目存在以下代价，请在使用前知悉：
-
-- ⏱️ **响应时间增加**：Agent 工作流需要额外处理时间，整体耗时可能增加 2-3 倍
-- 💸 **初期 Token 消耗**：对话前几轮需要建立情景状态，Token 消耗可能略高于直接调用
-- 🔧 **系统复杂度**：相比直接调用 LLM，需要额外的服务部署和维护
-
-**适用场景**：如果你追求长期连贯的大型角色扮演体验，不介意稍慢的响应速度，那么这些代价是值得的。
+- 🚀 **超高速响应**：采用 Gemini 2.5 Flash 智能代理，仅比正常回复多 20-30 秒
 
 ## 🎯 如何使用
 
-### 超简单集成
-1. **启动服务**：运行 `uv run python main.py`，系统在 6666 端口启动
-2. **更换接口**：在 SillyTavern、OpenWebUI 等平台中：
-   - 将 `base_url` 改为 `http://localhost:6666/v1`
-   - API Key 保持不变（直接透传给后端模型）
-3. **开始使用**：立即享受无遗忘的角色扮演体验！
+### 💾 快速上手 - 下载即用版本
 
-### 兼容性说明
+1. **📦 解压软件包**
+   - 下载发布的软件包并解压到**非中文路径**下
+   - 解压后文件夹包含：`config.yaml` 配置文件 + `DeepRolePlay.exe` 主程序
+
+2. **⚙️ 修改配置文件**
+   
+   编辑 `config.yaml` 文件，**强烈推荐智能代理使用 Gemini 2.5 Flash（响应仅比正常多20秒）**：
+
+   ```yaml
+   # API代理配置 - 转发目标
+   proxy:
+     target_url: "https://api.deepseek.com/v1"                      # 你要转发的API地址，推荐deepseek
+     timeout: 60                                                     # 建议设置60秒
+   
+   # 智能体配置 - Agent 使用的模型（必须是Gemini 2.5 Flash）
+   agent:
+     model: "gemini-2.5-flash"                                       # 强烈推荐 使用 Gemini 2.5 Flash
+     base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API地址
+     api_key: "your-gemini-api-key"                                  # 填入你的 Gemini API Key
+     temperature: 0.7
+     max_iterations: 25
+   
+   # 服务器配置
+   server:
+     host: "0.0.0.0"
+     port: 6666                                                      # 记住这个端口号
+   ```
+
+3. **🚀 启动程序**
+   - 双击 `DeepRolePlay.exe` 启动
+   - 看到 "服务已启动" 提示即可
+
+4. **🔗 配置角色扮演前端**
+   - 在 SillyTavern、OpenWebUI 等平台中
+   - 将 `base_url` 改为：`http://localhost:6666/v1`
+   - API Key 保持不变（会自动转发）
+   - **重要**：关闭历史记录限制，务必发送全部历史记录给代理！（不用担心token爆炸，max_history_length会控制）
+
+5. **🎭 开始角色扮演**
+   - 立即享受无遗忘的角色扮演体验！
+
+### 🔧 兼容性说明
 - ✅ **完全兼容 OpenAI API 格式**：所有支持 OpenAI 的工具都能直接使用
-- ✅ **支持主流模型**：OpenAI GPT、DeepSeek、Claude、本地 Ollama 等
+- ✅ **支持主流模型**：Gemini、DeepSeek、Claude、本地 Ollama 等
 - ✅ **双重配置**：Agent 和转发目标可使用不同模型，成本优化灵活
 
 ## Agent 工作原理
@@ -81,7 +110,7 @@ DeepRolePlay 的 Agent 解决方案：
     返回增强响应
 ```
 
-## 使用步骤
+## 开发者帮助
 
 ### 环境要求
 
@@ -99,22 +128,21 @@ uv pip install -r requirements.txt
 
 ### 2. 配置服务
 
-编辑 `config/config.yaml` 文件，**推荐使用 DeepSeek（性价比最高）**：
+编辑 `config/config.yaml` 文件，**推荐使用 Gemini 2.5 Flash（响应快）**：
 
 ```yaml
 # API代理配置 - 转发目标
 proxy:
-  target_url: "https://api.deepseek.com/v1"   # 推荐 DeepSeek，成本低性能好
-  api_key: "your-deepseek-api-key"            # DeepSeek API Key
-  timeout: 30                                 # 请求超时时间（秒）
+  target_url: "https://api.deepseek.com/v1"                      # 你要转发的API地址
+  timeout: 60                                                     # 请求超时时间（秒）
 
-# 智能体配置 - Agent 使用的模型  
+# 智能体配置 - Agent 使用的模型（必须是Gemini 2.5 Flash）
 agent:
-  model: "deepseek-chat"                      # 推荐 DeepSeek Chat，经济实惠
-  base_url: "https://api.deepseek.com/v1"    # 可与代理目标不同
-  api_key: "your-deepseek-api-key"            # 可使用相同或不同的 API Key
-  temperature: 0.1                            # 生成温度（0-1）
-  max_iterations: 25                          # 最大迭代次数
+  model: "gemini-2.5-flash"                                       # 必须使用 Gemini 2.5 Flash
+  base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API地址
+  api_key: "your-gemini-api-key"                                  # 填入你的 Gemini API Key
+  temperature: 0.7                                                # 生成温度（0-1）
+  max_iterations: 25                                              # 最大迭代次数
 
 # 情景管理
 scenario:
@@ -147,12 +175,23 @@ http://localhost:6666/v1
 4. 将增强的上下文注入请求
 5. 返回更准确的角色扮演响应
 
+### 5. 打包发布
+
+使用 PyInstaller 打包为可执行文件：
+
+```bash
+pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" main.py
+```
+
+打包后在 `dist/` 目录下会生成 `DeepRolePlay.exe`，连同配置文件一起发布给用户。
+
 ## 支持的模型
 
 ### 🔌 全面兼容 OpenAI 格式 API
 本项目采用标准 OpenAI API 格式，支持所有兼容的服务商：
 
-- **🌟 DeepSeek**（强烈推荐）：性价比最高，角色扮演效果出色
+- **🌟 Gemini 2.5 Flash**（强烈推荐）：速度最快，仅增加20秒响应时间，角色扮演效果出色
+- **💰 DeepSeek**：性价比最高，成本低廉
 - **💻 本地 Ollama**：完全私有化部署，数据安全
 
 ### ⚠️ 不推荐 OpenAI 官方 API

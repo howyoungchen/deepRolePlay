@@ -36,26 +36,32 @@ router = APIRouter()
 class ProxyService:
     def __init__(self):
         self.target_url = f"{settings.proxy.target_url.rstrip('/')}/chat/completions"
-        self.api_key = settings.proxy.api_key
         self.timeout = settings.proxy.timeout
         
-    def _get_headers(self) -> Dict[str, str]:
-        """获取请求头"""
-        return {
-            "Authorization": f"Bearer {self.api_key}",
+    def _get_headers(self, request: Request) -> Dict[str, str]:
+        """获取请求头，从原始请求中提取Authorization头部"""
+        headers = {
             "Content-Type": "application/json",
-            "User-Agent": "NarratorAI-Proxy/1.0"
+            "User-Agent": "DeepRolePlay-Proxy/1.0"
         }
+        
+        # 从原始请求中提取Authorization头部
+        auth_header = request.headers.get("authorization")
+        if auth_header:
+            headers["Authorization"] = auth_header
+        
+        return headers
     
     async def _forward_non_streaming(
         self, 
+        request: Request,
         request_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """转发非流式请求"""
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 self.target_url,
-                headers=self._get_headers(),
+                headers=self._get_headers(request),
                 json=request_data
             )
             response.raise_for_status()
@@ -63,6 +69,7 @@ class ProxyService:
     
     async def _forward_streaming(
         self, 
+        request: Request,
         request_data: Dict[str, Any]
     ) -> AsyncGenerator[str, None]:
         """转发流式请求"""
@@ -70,7 +77,7 @@ class ProxyService:
             async with client.stream(
                 "POST",
                 self.target_url,
-                headers=self._get_headers(),
+                headers=self._get_headers(request),
                 json=request_data
             ) as response:
                 response.raise_for_status()
@@ -151,7 +158,7 @@ class ProxyService:
         start_time: float
     ):
         """处理非流式请求"""
-        response_data = await self._forward_non_streaming(request_data)
+        response_data = await self._forward_non_streaming(request, request_data)
         duration = time.time() - start_time
         
         response = JSONResponse(content=response_data)
@@ -229,7 +236,7 @@ class ProxyService:
         async def stream_generator():
             nonlocal chunks_count, collected_chunks
             try:
-                async for chunk in self._forward_streaming(request_data):
+                async for chunk in self._forward_streaming(request, request_data):
                     chunks_count += 1
                     collected_chunks.append(chunk)
                     yield chunk
@@ -301,7 +308,7 @@ class ProxyService:
                 request_data["messages"] = injected_messages
                 
                 # 6. 流式输出LLM响应
-                async for llm_chunk in self._forward_streaming(request_data):
+                async for llm_chunk in self._forward_streaming(request, request_data):
                     chunks_count += 1
                     collected_chunks.append(llm_chunk)
                     yield llm_chunk

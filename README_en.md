@@ -10,6 +10,8 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 
 ## 🚀 Solving Core Pain Points of Role-Playing
 
+<img src="pics/generate.png" alt="DeepRolePlay Demo" width="150">
+
 ### 😤 Have You Ever Encountered These Problems?
 - 🤖 **AI Suddenly Forgets Character Settings**: A mage suddenly picks up a sword
 - 📖 **Inconsistent Plot**: Important plots from yesterday are completely forgotten today
@@ -21,29 +23,57 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 - 💰 **Cost Control**: Scenario compression technology, long conversation costs reduced by 80%
 - 📚 **Intelligent Internet Access**: Integrated Wikipedia, free automatic completion of character backgrounds and story settings
 - ⚡ **Plug and Play**: 5-minute integration, direct use with SillyTavern and other platforms
+- 🚀 **Ultra-Fast Response**: Using Gemini 2.5 Flash intelligent agents, only 20-30 seconds longer than normal responses
 
-### ⚖️ Trade-offs and Disadvantages
-
-To achieve the above effects, this project has the following costs, please be aware before use:
-
-- ⏱️ **Increased Response Time**: Agent workflow requires additional processing time, overall time consumption may increase by 2-3 times
-- 💸 **Initial Token Consumption**: The first few rounds of conversation need to establish scenario state, token consumption may be slightly higher than direct calls
-- 🔧 **System Complexity**: Compared to direct LLM calls, requires additional service deployment and maintenance
-
-**Applicable Scenarios**: If you pursue long-term coherent large-scale role-playing experiences and don't mind slightly slower response speeds, these costs are worthwhile.
 
 ## 🎯 How to Use
 
-### Super Simple Integration
-1. **Start Service**: Run `uv run python main.py`, system starts on port 6666
-2. **Change Interface**: In platforms like SillyTavern, OpenWebUI:
-   - Change `base_url` to `http://localhost:6666/v1`
-   - Keep API Key unchanged (directly passed to backend model)
-3. **Start Using**: Immediately enjoy forgetting-free role-playing experience!
+### 💾 Quick Start - Ready-to-Use Version
 
-### Compatibility Description
+1. **📦 Extract Software Package**
+   - Download the released software package and extract it to a **non-Chinese path**
+   - The extracted folder contains: `config.yaml` configuration file + `DeepRolePlay.exe` main program
+
+2. **⚙️ Modify Configuration File**
+   
+   Edit the `config.yaml` file, **Gemini 2.5 Flash is strongly recommended for intelligent agents (only 20 seconds longer response than normal)**:
+
+   ```yaml
+   # API Proxy Configuration - Forwarding Target
+   proxy:
+     target_url: "https://api.deepseek.com/v1"                      # Your forwarding API address, DeepSeek recommended
+     timeout: 60                                                     # Recommended 60 seconds
+   
+   # Agent Configuration - Model used by Agent (Must be Gemini 2.5 Flash)
+   agent:
+     model: "gemini-2.5-flash"                                       # Strongly recommended: Gemini 2.5 Flash
+     base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API address
+     api_key: "your-gemini-api-key"                                  # Your Gemini API Key
+     temperature: 0.7
+     max_iterations: 25
+   
+   # Server Configuration
+   server:
+     host: "0.0.0.0"
+     port: 6666                                                      # Remember this port number
+   ```
+
+3. **🚀 Start Program**
+   - Double-click `DeepRolePlay.exe` to start
+   - Wait for "Service Started" prompt
+
+4. **🔗 Configure Role-Playing Frontend**
+   - In platforms like SillyTavern, OpenWebUI
+   - Change `base_url` to: `http://localhost:6666/v1`
+   - Keep API Key unchanged (will be automatically forwarded)
+   - **Important**: Disable history record limits, must send full history to proxy! (Don't worry about token explosion, max_history_length will control it)
+
+5. **🎭 Start Role-Playing**
+   - Immediately enjoy forgetting-free role-playing experience!
+
+### 🔧 Compatibility Description
 - ✅ **Fully Compatible with OpenAI API Format**: All tools supporting OpenAI can be used directly
-- ✅ **Support Mainstream Models**: OpenAI GPT, DeepSeek, Claude, local Ollama, etc.
+- ✅ **Support Mainstream Models**: Gemini, DeepSeek, Claude, local Ollama, etc.
 - ✅ **Dual Configuration**: Agent and forwarding target can use different models, flexible cost optimization
 
 ## Agent Working Principle
@@ -81,7 +111,7 @@ Memory Flashback  Scenario Update
     Return Enhanced Response
 ```
 
-## Usage Steps
+## Developer Guide
 
 ### Environment Requirements
 
@@ -99,22 +129,21 @@ uv pip install -r requirements.txt
 
 ### 2. Configure Service
 
-Edit `config/config.yaml` file, **DeepSeek is recommended (best cost-performance)**:
+Edit `config/config.yaml` file, **Gemini 2.5 Flash is recommended (fast response)**:
 
 ```yaml
 # API Proxy Configuration - Forwarding Target
 proxy:
-  target_url: "https://api.deepseek.com/v1"   # Recommend DeepSeek, low cost and good performance
-  api_key: "your-deepseek-api-key"            # DeepSeek API Key
-  timeout: 30                                 # Request timeout (seconds)
+  target_url: "https://api.deepseek.com/v1"                      # Your forwarding API address
+  timeout: 60                                                     # Request timeout (seconds)
 
-# Agent Configuration - Model used by Agent  
+# Agent Configuration - Model used by Agent (Must be Gemini 2.5 Flash)
 agent:
-  model: "deepseek-chat"                      # Recommend DeepSeek Chat, economical
-  base_url: "https://api.deepseek.com/v1"    # Can be different from proxy target
-  api_key: "your-deepseek-api-key"            # Can use same or different API Key
-  temperature: 0.1                            # Generation temperature (0-1)
-  max_iterations: 25                          # Maximum iterations
+  model: "gemini-2.5-flash"                                       # Must use Gemini 2.5 Flash
+  base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API address
+  api_key: "your-gemini-api-key"                                  # Your Gemini API Key
+  temperature: 0.7                                                # Generation temperature (0-1)
+  max_iterations: 25                                              # Maximum iterations
 
 # Scenario Management
 scenario:
@@ -147,12 +176,23 @@ The system will automatically:
 4. Inject enhanced context into requests
 5. Return more accurate role-playing responses
 
+### 5. Package for Distribution
+
+Use PyInstaller to package as executable:
+
+```bash
+pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" main.py
+```
+
+After packaging, `DeepRolePlay.exe` will be generated in the `dist/` directory, distribute it together with the configuration file to users.
+
 ## Supported Models
 
 ### 🔌 Full Compatibility with OpenAI Format API
 This project uses standard OpenAI API format, supporting all compatible service providers:
 
-- **🌟 DeepSeek** (Highly Recommended): Best cost-performance, excellent role-playing effects
+- **🌟 Gemini 2.5 Flash** (Strongly Recommended): Fastest speed, only adds 20 seconds response time, excellent role-playing effects
+- **💰 DeepSeek**: Best cost-performance, low cost
 - **💻 Local Ollama**: Fully private deployment, data security
 
 ### ⚠️ OpenAI Official API Not Recommended
