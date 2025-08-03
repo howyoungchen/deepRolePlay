@@ -10,7 +10,7 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 
 ## 🚀 Solving Core Pain Points of Role-Playing
 
-<img src="pics/generate.png" alt="DeepRolePlay Demo" width="150">
+<img src="pics/generate.png" alt="DeepRolePlay Demo" width="200">
 
 ### 😤 Have You Ever Encountered These Problems?
 - 🤖 **AI Suddenly Forgets Character Settings**: A mage suddenly picks up a sword
@@ -24,7 +24,6 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 - 📚 **Intelligent Internet Access**: Integrated Wikipedia, free automatic completion of character backgrounds and story settings
 - ⚡ **Plug and Play**: 5-minute integration, direct use with SillyTavern and other platforms
 - 🚀 **Ultra-Fast Response**: Using Gemini 2.5 Flash intelligent agents, only 20-30 seconds longer than normal responses
-
 
 ## 🎯 How to Use
 
@@ -60,7 +59,8 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 
 3. **🚀 Start Program**
    - Double-click `DeepRolePlay.exe` to start
-   - Wait for "Service Started" prompt
+   - You can see the project running normally in the terminal
+   - 🌟 This project will check if the port is occupied. If it is, it will automatically increment by 1. Therefore, the actual port needs to be checked from the terminal output.
 
 4. **🔗 Configure Role-Playing Frontend**
    - In platforms like SillyTavern, OpenWebUI
@@ -169,6 +169,8 @@ Change your AI application's (SillyTavern, OpenWebUI, etc.) API endpoint to:
 http://localhost:6666/v1
 ```
 
+> 🌟 This project will check if the port is occupied. If it is, it will automatically increment by 1. Therefore, the actual port needs to be checked from the terminal output.
+
 The system will automatically:
 1. Intercept conversation requests
 2. Execute agent workflow
@@ -198,6 +200,7 @@ This project uses standard OpenAI API format, supporting all compatible service 
 ### ⚠️ OpenAI Official API Not Recommended
 Although fully compatible with OpenAI format, **using OpenAI official service is not recommended**:
 - 🔒 **Excessive Safety Policies**: Strict restrictions on role-playing content, affecting experience
+
 
 ## References
 
