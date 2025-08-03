@@ -13,7 +13,7 @@ from utils.logger import request_logger
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    print("=== NarratorAI Proxy Server 启动 ===")
+    print("=== DeepRolePlay Proxy Server 启动 ===")
     print(f"目标URL: {settings.proxy.target_url}")
     print(f"日志目录: {settings.system.log_dir}")
     print(f"服务器: {settings.server.host}:{settings.server.port}")
@@ -22,13 +22,13 @@ async def lifespan(app: FastAPI):
     yield
     
     # 关闭时执行
-    print("NarratorAI Proxy Server 已关闭")
+    print("DeepRolePlay Proxy Server 已关闭")
 
 
 def create_app() -> FastAPI:
     """创建FastAPI应用"""
     app = FastAPI(
-        title="NarratorAI Proxy Server",
+        title="DeepRolePlay Proxy Server",
         description="AI角色扮演代理系统 - HTTP代理服务器",
         version="1.0.0",
         docs_url="/docs",

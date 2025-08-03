@@ -10,7 +10,7 @@ from typing import Optional, List
 
 class ProxyConfig(BaseModel):
     target_url: str = "https://api.openai.com/v1/chat/completions"
-    api_key: str = "sk-your-api-key-here"
+    api_key: Optional[str] = None  # API密钥从前端请求中获取，不再需要配置
     timeout: int = 30
 
 

@@ -3,7 +3,6 @@
 # API代理相关配置
 proxy:
   target_url: "https://api.deepseek.com/v1"
-  api_key: "YOUR_API_KEY_HERE"
   timeout: 30
 
 # 情景管理相关配置

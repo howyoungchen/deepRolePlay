@@ -24,7 +24,7 @@ class WorkflowStreamConverter:
             "id": f"chatcmpl-{self.request_id}",
             "object": "chat.completion.chunk",
             "created": self.created_time,
-            "model": "narrator-workflow",
+            "model": "DeepRolePlay-workflow",
             "choices": [{
                 "index": 0,
                 "delta": {
@@ -44,7 +44,7 @@ class WorkflowStreamConverter:
             "id": f"chatcmpl-{self.request_id}",
             "object": "chat.completion.chunk", 
             "created": self.created_time,
-            "model": "narrator-workflow",
+            "model": "DeepRolePlay-workflow",
             "choices": [{
                 "index": 0,
                 "delta": {},
