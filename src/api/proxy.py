@@ -91,7 +91,14 @@ def _clear_scenarios_directory():
 
 def _create_debug_response(request_id: str, model: str, stream: bool = False) -> Dict[str, Any]:
     """Create a debug response with test message."""
-    response_content = "测试消息"
+    # Convert image to base64 for SillyTavern compatibility
+    import base64
+    try:
+        with open("/home/chiye/worklab/deepRolePlay/pics/generate.png", "rb") as img_file:
+            img_data = base64.b64encode(img_file.read()).decode('utf-8')
+            response_content = f'这是一位像素风格的蓝袍法师，手持步枪的奇幻形象：\n\n<img src="data:image/png;base64,{img_data}" alt="Wizard" style="max-width: 300px;">'
+    except FileNotFoundError:
+        response_content = "🧙‍♂️ Wizard image not found, but the magic continues!"
     
     if stream:
         # Streaming response format
