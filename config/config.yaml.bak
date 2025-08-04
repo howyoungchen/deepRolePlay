@@ -4,6 +4,7 @@
 proxy:
   target_url: "https://api.deepseek.com/v1"
   timeout: 30
+  debug_mode: false  # 启用调试模式，跳过工作流和LLM调用，直接返回带图片的测试消息
 
 # Scenario Management Related Configuration
 scenario:
