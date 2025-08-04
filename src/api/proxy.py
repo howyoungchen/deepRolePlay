@@ -96,7 +96,7 @@ def _create_debug_response(request_id: str, model: str, stream: bool = False) ->
     try:
         with open("/home/chiye/worklab/deepRolePlay/pics/generate.png", "rb") as img_file:
             img_data = base64.b64encode(img_file.read()).decode('utf-8')
-            response_content = f'这是一位像素风格的蓝袍法师，手持步枪的奇幻形象：\n\n<img src="data:image/png;base64,{img_data}" alt="Wizard" style="max-width: 300px;">'
+            response_content = f'This is a pixel-style blue-robed wizard holding a rifle fantasy image:\n\n<img src="data:image/png;base64,{img_data}" alt="Wizard" style="max-width: 300px;">'
     except FileNotFoundError:
         response_content = "🧙‍♂️ Wizard image not found, but the magic continues!"
     
@@ -281,7 +281,7 @@ async def _handle_debug_mode_request(
             request=request,
             response=response,
             request_body={"debug_mode": True, "model": chat_request.model},
-            response_body={"message": "测试消息", "debug_mode": True, "stream": True},
+            response_body={"message": "Test message", "debug_mode": True, "stream": True},
             duration=0.001,
             request_id=request_id
         )
@@ -301,7 +301,7 @@ async def _handle_debug_mode_request(
             request=request,
             response=response,
             request_body={"debug_mode": True, "model": chat_request.model},
-            response_body={"message": "测试消息", "debug_mode": True, "stream": False},
+            response_body={"message": "Test message", "debug_mode": True, "stream": False},
             duration=0.001,
             request_id=request_id
         )
@@ -626,14 +626,20 @@ class ProxyService:
             try:
                 # 2. Check if the workflow is enabled
                 if settings.workflow.enabled:
-                    # Workflow enabled: first, stream workflow events
-                    from utils.stream_converter import WorkflowStreamConverter
-                    converter = WorkflowStreamConverter(request_id)
-                    
+                    # Workflow enabled: execute workflow
                     workflow_events = scenario_manager.update_scenario_streaming(original_messages)
                     
-                    async for sse_chunk in converter.convert_workflow_events(workflow_events):
-                        yield sse_chunk
+                    if settings.workflow.stream_output:
+                        # Push workflow details to frontend
+                        from utils.stream_converter import WorkflowStreamConverter
+                        converter = WorkflowStreamConverter(request_id)
+                        
+                        async for sse_chunk in converter.convert_workflow_events(workflow_events):
+                            yield sse_chunk
+                    else:
+                        # Execute workflow silently without pushing details
+                        async for event in workflow_events:
+                            pass  # Consume events but don't output
                     
                     # 3. After the workflow completes, read the updated scenario content
                     from utils.scenario_utils import read_scenario
