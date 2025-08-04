@@ -13,6 +13,7 @@ class ProxyConfig(BaseModel):
     models_url: Optional[str] = None  # The URL for the models API. If not set, it's automatically constructed from target_url.
     api_key: Optional[str] = None  # API key is obtained from the frontend request, no longer needs to be configured.
     timeout: int = 30
+    debug_mode: bool = False
     
     def get_models_url(self) -> str:
         """Get the models API URL. If not set, it's automatically constructed from target_url."""
