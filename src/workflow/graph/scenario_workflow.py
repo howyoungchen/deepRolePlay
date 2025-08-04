@@ -4,7 +4,7 @@ Scenario Update Workflow - Integrating Memory Flashback and Scenario Update usin
 import asyncio
 import sys
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from typing_extensions import TypedDict
 
 # Add project root to Python path
@@ -63,6 +63,15 @@ class ParentState(TypedDict):
     
     # Output results
     final_scenario: str        # Final updated scenario
+    
+    # 新增字段 - 请求处理相关（使用Optional避免必需字段错误）
+    request_id: Optional[str] = None                    # 请求追踪ID
+    original_messages: Optional[List[Dict]] = None      # 原始消息（未注入情景）
+    injected_messages: Optional[List[Dict]] = None      # 注入情景后的消息
+    llm_response: Optional[Any] = None                  # 最终LLM响应
+    api_key: Optional[str] = None                       # API密钥（从请求中提取）
+    model: Optional[str] = None                         # 模型名称（从请求中提取）
+    stream: Optional[bool] = None                       # 是否流式响应
 
 
 def create_model():
@@ -298,6 +307,109 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
         return {"final_scenario": "Scenario update failed"}
 
 
+async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
+    """LLM转发节点：整合情景注入和LLM调用"""
+    import time
+    start_time = time.time()
+    
+    # 准备输入数据
+    original_messages = state.get("original_messages", state.get("messages", []))
+    api_key = state.get("api_key", "")
+    model_name = state.get("model", "")
+    stream = state.get("stream", False)
+    
+    inputs = {
+        "messages_count": len(original_messages),
+        "model": model_name,
+        "stream": stream,
+        "has_api_key": bool(api_key)
+    }
+    
+    try:
+        # 1. 读取最新情景内容
+        from utils.scenario_utils import read_scenario
+        current_scenario = await read_scenario()
+        
+        # 2. 情景注入（作为节点内的前置操作）
+        from utils.messages_process import inject_scenario
+        injected_messages = inject_scenario(
+            original_messages, 
+            current_scenario
+        )
+        
+        # 3. 创建LLM模型（使用请求中的配置）
+        from langchain_openai import ChatOpenAI
+        proxy_config = settings.proxy
+        
+        # 构建LLM实例（使用请求中的API密钥和模型名称）
+        llm = ChatOpenAI(
+            base_url=proxy_config.base_url,
+            model=model_name if model_name else proxy_config.model,
+            api_key=api_key if api_key else proxy_config.api_key,
+            temperature=0.7,
+            streaming=stream
+        )
+        
+        # 4. 转换消息格式为LangChain格式
+        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+        langchain_messages = []
+        for msg in injected_messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "system":
+                langchain_messages.append(SystemMessage(content=content))
+            elif role == "user":
+                langchain_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                langchain_messages.append(AIMessage(content=content))
+        
+        # 5. 调用LLM
+        response = await llm.ainvoke(langchain_messages)
+        
+        duration = time.time() - start_time
+        
+        outputs = {
+            "injected_messages_count": len(injected_messages),
+            "response_content_length": len(response.content) if hasattr(response, 'content') else 0,
+            "duration": duration
+        }
+        
+        # 记录日志
+        await workflow_logger.log_agent_execution(
+            node_type="llm_forwarding",
+            inputs=inputs,
+            agent_response={"response": response.content if hasattr(response, 'content') else str(response)},
+            outputs=outputs,
+            duration=duration
+        )
+        
+        return {
+            "injected_messages": injected_messages,
+            "llm_response": response
+        }
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        duration = time.time() - start_time
+        
+        # 记录错误
+        await workflow_logger.log_execution_error(
+            node_type="llm_forwarding",
+            inputs=inputs,
+            error_message=str(e),
+            error_details=error_details
+        )
+        
+        print(f"LLM forwarding node execution failed: {str(e)}")
+        # 返回错误响应
+        from langchain_core.messages import AIMessage
+        return {
+            "injected_messages": original_messages,
+            "llm_response": AIMessage(content=f"Error: {str(e)}")
+        }
+
+
 def create_scenario_workflow():
     """Create the scenario update workflow."""
     builder = StateGraph(ParentState)
@@ -305,11 +417,13 @@ def create_scenario_workflow():
     # Add nodes
     builder.add_node("memory_flashback", memory_flashback_node)
     builder.add_node("scenario_updater", scenario_updater_node)
+    builder.add_node("llm_forwarding", llm_forwarding_node)  # 新增LLM转发节点
     
-    # Add edges
+    # Add edges - 修改边：START → memory_flashback → scenario_updater → llm_forwarding → END
     builder.add_edge(START, "memory_flashback")
     builder.add_edge("memory_flashback", "scenario_updater")
-    builder.add_edge("scenario_updater", END)
+    builder.add_edge("scenario_updater", "llm_forwarding")  # 新增边
+    builder.add_edge("llm_forwarding", END)  # 修改结束边
     
     return builder.compile()
 
