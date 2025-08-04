@@ -89,6 +89,56 @@ def _clear_scenarios_directory():
     return True
 
 
+def _create_debug_response(request_id: str, model: str, stream: bool = False) -> Dict[str, Any]:
+    """Create a debug response with test message."""
+    # Convert image to base64 for SillyTavern compatibility
+    import base64
+    try:
+        with open("/home/chiye/worklab/deepRolePlay/pics/generate.png", "rb") as img_file:
+            img_data = base64.b64encode(img_file.read()).decode('utf-8')
+            response_content = f'这是一位像素风格的蓝袍法师，手持步枪的奇幻形象：\n\n<img src="data:image/png;base64,{img_data}" alt="Wizard" style="max-width: 300px;">'
+    except FileNotFoundError:
+        response_content = "🧙‍♂️ Wizard image not found, but the magic continues!"
+    
+    if stream:
+        # Streaming response format
+        return {
+            "id": f"chatcmpl-{request_id}",
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "delta": {
+                    "role": "assistant",
+                    "content": response_content
+                },
+                "finish_reason": "stop"
+            }]
+        }
+    else:
+        # Non-streaming response format
+        return {
+            "id": f"chatcmpl-{request_id}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": response_content
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": len(response_content),
+                "total_tokens": 10 + len(response_content)
+            }
+        }
+
+
 def _create_new_conversation_response(request_id: str, model: str, stream: bool = False) -> Dict[str, Any]:
     """Create a success response for a new conversation."""
     response_content = "A new conversation has been successfully started."
@@ -191,6 +241,67 @@ async def _handle_new_conversation_request(
             response=response,
             request_body={"trigger": "new_conversation", "model": chat_request.model},
             response_body={"message": "New conversation started", "scenarios_cleared": True, "stream": False},
+            duration=0.001,
+            request_id=request_id
+        )
+        
+        return response
+
+
+async def _handle_debug_mode_request(
+    request: Request,
+    chat_request: ChatCompletionRequest
+) -> Union[StreamingResponse, JSONResponse]:
+    """Handle debug mode requests with test message."""
+    request_id = str(uuid.uuid4())
+    
+    if chat_request.stream:
+        # Create streaming response with one big chunk
+        response_data = _create_debug_response(request_id, chat_request.model, stream=True)
+        
+        async def debug_stream():
+            # Send the complete message in one chunk
+            yield f"data: {json.dumps(response_data)}\n\n"
+            # Send the end-of-stream marker
+            yield "data: [DONE]\n\n"
+        
+        response = StreamingResponse(
+            debug_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Request-ID": request_id,
+                "X-Debug-Mode": "true"
+            }
+        )
+        
+        # Log the debug mode request
+        await request_logger.log_request_response(
+            request=request,
+            response=response,
+            request_body={"debug_mode": True, "model": chat_request.model},
+            response_body={"message": "测试消息", "debug_mode": True, "stream": True},
+            duration=0.001,
+            request_id=request_id
+        )
+        
+        return response
+    else:
+        # Create non-streaming response
+        response_data = _create_debug_response(request_id, chat_request.model, stream=False)
+        response = JSONResponse(
+            content=response_data,
+            status_code=200,
+            headers={"X-Request-ID": request_id, "X-Debug-Mode": "true"}
+        )
+        
+        # Log the debug mode request
+        await request_logger.log_request_response(
+            request=request,
+            response=response,
+            request_body={"debug_mode": True, "model": chat_request.model},
+            response_body={"message": "测试消息", "debug_mode": True, "stream": False},
             duration=0.001,
             request_id=request_id
         )
@@ -671,6 +782,10 @@ proxy_service = ProxyService()
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request, chat_request: ChatCompletionRequest):
     """OpenAI-compatible chat completion endpoint."""
+    
+    # Check if debug mode is enabled
+    if settings.proxy.debug_mode:
+        return await _handle_debug_mode_request(request, chat_request)
     
     # Check if a new conversation is triggered
     if _check_new_conversation_trigger(chat_request.messages):
