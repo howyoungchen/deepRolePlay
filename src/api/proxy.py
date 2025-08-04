@@ -96,7 +96,10 @@ def _create_debug_response(request_id: str, model: str, stream: bool = False) ->
     try:
         with open("/home/chiye/worklab/deepRolePlay/pics/generate.png", "rb") as img_file:
             img_data = base64.b64encode(img_file.read()).decode('utf-8')
-            response_content = f'This is a pixel-style blue-robed wizard holding a rifle fantasy image:\n\n<img src="data:image/png;base64,{img_data}" alt="Wizard" style="max-width: 300px;">'
+            
+        # 发送两张相同的图片来测试前端显示效果
+        response_content = f'Testing two images display:\n\n图片1:\n<img src="data:image/png;base64,{img_data}" alt="Wizard 1" style="max-width: 300px;"><img src="data:image/png;base64,{img_data}" alt="Wizard 2" style="max-width: 300px;">'
+            
     except FileNotFoundError:
         response_content = "🧙‍♂️ Wizard image not found, but the magic continues!"
     
