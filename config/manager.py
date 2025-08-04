@@ -45,6 +45,7 @@ class ScenarioConfig(BaseModel):
 
 class WorkflowConfig(BaseModel):
     enabled: bool = True
+    stream_output: bool = True  # Control whether streaming requests push workflow details to frontend
 
 
 class LangGraphConfig(BaseModel):

@@ -68,6 +68,9 @@ class WorkflowStreamConverter:
             SSE formatted string
         """
         try:
+            # Send <think> tag at the beginning
+            yield self.create_sse_data("<think>\n", "workflow_think")
+            
             # Send workflow start event
             yield self.create_sse_data("🔄 Starting to update scenario...\n\n", "workflow_start")
             
@@ -78,11 +81,19 @@ class WorkflowStreamConverter:
             
             # Send workflow completion event
             yield self.create_sse_data("\n✅ Scenario update complete, starting to generate response...\n\n", "workflow_end")
+            
+            # Send </think> tag at the end
+            yield self.create_sse_data("</think>\n", "workflow_think")
+            
             yield self.create_workflow_done_event()
             
         except Exception as e:
             error_msg = f"❌ Error executing workflow: {str(e)}\n\n"
             yield self.create_sse_data(error_msg, "workflow_error")
+            
+            # Send </think> tag even in error cases
+            yield self.create_sse_data("</think>\n", "workflow_think")
+            
             yield self.create_workflow_done_event()
     
     def _process_event(self, event: Dict[str, Any]) -> str:
