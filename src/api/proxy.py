@@ -94,10 +94,6 @@ class ProxyService:
             
             response = JSONResponse(content=response_data)
             
-            await LoggingUtils.log_workflow_request(
-                request, response, chat_request, response_data, duration, request_id
-            )
-            
             return response
             
         except Exception as e:
@@ -109,10 +105,6 @@ class ProxyService:
             )
             
             response = JSONResponse(content=error_data, status_code=500)
-            
-            await LoggingUtils.log_workflow_request(
-                request, response, chat_request, error_data, duration, request_id
-            )
             
             return response
     

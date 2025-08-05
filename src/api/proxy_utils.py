@@ -104,7 +104,7 @@ class ResponseBuilder:
             try:
                 with open("/home/chiye/worklab/deepRolePlay/pics/generate.png", "rb") as img_file:
                     img_data = base64.b64encode(img_file.read()).decode('utf-8')
-                    content = (f'Testing two images display:\n\n图片1:\n'
+                    content = (f'Testing two images display:\n\nImage 1:\n'
                               f'<img src="data:image/png;base64,{img_data}" alt="Wizard 1" style="max-width: 300px;">'
                               f'<img src="data:image/png;base64,{img_data}" alt="Wizard 2" style="max-width: 300px;">')
             except FileNotFoundError:
@@ -174,7 +174,7 @@ class StreamingHandler:
         
         # 记录日志
         if log_data:
-            LoggingUtils.log_response(
+            await LoggingUtils.log_response(
                 request=request,
                 response=response,
                 request_body=log_data.get("request_body", {}),
@@ -252,7 +252,7 @@ class LoggingUtils:
     """日志记录工具类"""
     
     @staticmethod
-    def log_response(
+    async def log_response(
         request: Request,
         response: Optional[Response],
         request_body: Dict[str, Any],
@@ -337,7 +337,7 @@ class SpecialRequestHandler:
             )
             
             # 记录日志
-            LoggingUtils.log_response(
+            await LoggingUtils.log_response(
                 request=request,
                 response=response,
                 request_body=log_data["request_body"],

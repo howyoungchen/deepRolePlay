@@ -35,7 +35,10 @@ async def read_scenario() -> str:
         return content.strip()
         
     except Exception as e:
-        print(f"Error: Failed to read scenario file: {str(e)}")
+        try:
+            print(f"Error: Failed to read scenario file: {str(e)}")
+        except UnicodeEncodeError:
+            print(f"Error: Failed to read scenario file: [encoding error in message]")
         # Return default scenario
         return "This is the beginning of a new conversation."
 
@@ -60,7 +63,10 @@ async def write_scenario(content: str) -> None:
         pass
         
     except Exception as e:
-        print(f"Error: Failed to save scenario file: {str(e)}")
+        try:
+            print(f"Error: Failed to save scenario file: {str(e)}")
+        except UnicodeEncodeError:
+            print(f"Error: Failed to save scenario file: [encoding error in message]")
         raise
 
 

@@ -314,7 +314,10 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
             error_details=error_details
         )
         
-        print(f"Scenario updater node execution failed: {str(e)}")
+        try:
+            print(f"Scenario updater node execution failed: {str(e)}")
+        except UnicodeEncodeError:
+            print(f"Scenario updater node execution failed: [encoding error in message]")
         return {"final_scenario": "Scenario update failed"}
 
 
@@ -436,7 +439,10 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
             error_details=error_details
         )
         
-        print(f"LLM forwarding node execution failed: {str(e)}")
+        try:
+            print(f"LLM forwarding node execution failed: {str(e)}")
+        except UnicodeEncodeError:
+            print(f"LLM forwarding node execution failed: [encoding error in message]")
         # 返回错误响应
         from langchain_core.messages import AIMessage
         return {
