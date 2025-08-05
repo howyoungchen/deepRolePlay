@@ -43,14 +43,11 @@ class ScenarioConfig(BaseModel):
     file_path: str = "./scenarios/current_scenario.txt"
 
 
-class WorkflowConfig(BaseModel):
-    enabled: bool = True
-    stream_output: bool = True  # Control whether streaming requests push workflow details to frontend
-
 
 class LangGraphConfig(BaseModel):
     max_history_length: int = 20
     history_ai_message_offset: int = 1  # Start counting history from the Nth-to-last AI message.
+    only_forward: bool = False  # 当为true时跳过记忆闪回和情景更新节点，直接转发到LLM
 
 
 class AgentConfig(BaseModel):
@@ -83,7 +80,6 @@ class Settings(BaseSettings):
     system: SystemConfig = SystemConfig()
     server: ServerConfig = ServerConfig()
     scenario: ScenarioConfig = ScenarioConfig()
-    workflow: WorkflowConfig = WorkflowConfig()
     langgraph: LangGraphConfig = LangGraphConfig()
     agent: AgentConfig = AgentConfig()
     

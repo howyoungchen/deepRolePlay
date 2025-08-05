@@ -439,7 +439,7 @@ class ProxyService:
         workflow = create_scenario_workflow()
         
         async def convert_to_sse():
-            """将工作流消息转换为SSE格式"""
+            """将工作流事件转换为SSE格式"""
             try:
                 # 准备工作流输入
                 workflow_input = {
@@ -452,25 +452,16 @@ class ProxyService:
                     "stream": chat_request.stream
                 }
                 
-                # 使用stream_mode="messages"来获取所有LLM节点的token流
-                async for msg, metadata in workflow.astream(
-                    workflow_input,
-                    stream_mode="messages"
-                ):
-                    # 不过滤！用户希望看到完整的AI思考过程
-                    # 包括记忆闪回、情景更新和最终的角色回复
-                    if hasattr(msg, 'content') and msg.content:
-                        # 转换为OpenAI SSE格式
-                        sse_chunk = convert_to_openai_sse(msg, metadata, chat_request.model)
+                # 导入事件格式化器
+                from utils.event_formatter import EventFormatter
+                formatter = EventFormatter(chat_request.model)
+                
+                # 使用astream_events来获取详细的流式事件
+                async for event in workflow.astream_events(workflow_input, version="v2"):
+                    # 使用事件格式化器处理事件
+                    sse_chunk = formatter.format_event_to_sse(event)
+                    if sse_chunk:
                         yield sse_chunk
-                    elif isinstance(msg, dict):
-                        # 处理字典格式的消息
-                        content = extract_content_from_event(msg)
-                        if content:
-                            from langchain_core.messages import AIMessage
-                            ai_msg = AIMessage(content=content)
-                            sse_chunk = convert_to_openai_sse(ai_msg, metadata, chat_request.model)
-                            yield sse_chunk
                 
                 # 发送结束标记
                 yield create_done_message()
