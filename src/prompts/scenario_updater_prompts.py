@@ -130,6 +130,9 @@ SCENARIO_UPDATER_USER_TEMPLATE = """
 - 从记忆闪回中提炼的必要背景
 
 请开始更新情景缓存。
+
+重要限制：
+- 语言一致性：使用工具和输出时必须与最新剧情发展使用相同的语言
 """
 
 # SCENARIO_UPDATER_PROMPT="""
