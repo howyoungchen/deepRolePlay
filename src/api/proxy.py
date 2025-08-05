@@ -116,44 +116,70 @@ class ProxyService:
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """完全基于工作流的流式请求处理"""
+        """完全基于工作流的流式请求处理（新版）"""
         request_id = str(uuid.uuid4())
         
         from src.workflow.graph.scenario_workflow import create_scenario_workflow
-        from utils.format_converter import create_done_message
+        from utils.format_converter import convert_chunk_to_sse, create_done_message, convert_chunk_to_sse_manual
         
         workflow = create_scenario_workflow()
         
-        async def convert_to_sse():
-            """将工作流事件转换为SSE格式"""
+        async def stream_generator():
+            """生成器，用于处理工作流并流式传输LLM响应"""
             try:
+                # 1. 准备并调用工作流
                 workflow_input = WorkflowHelper.prepare_workflow_input(
                     request, chat_request, request_id, current_scenario=""
                 )
+                workflow_input["stream"] = True
                 
-                from utils.event_formatter import EventFormatter
-                formatter = EventFormatter(chat_request.model)
+                # 使用ainvoke获取最终结果，其中包含流对象
+                result = await workflow.ainvoke(workflow_input)
                 
-                async for event in workflow.astream_events(workflow_input, version="v2"):
-                    sse_chunk = formatter.format_event_to_sse(event)
+                # 2. 从结果中提取流
+                llm_stream = result.get("llm_response")
+                
+                if not llm_stream or not hasattr(llm_stream, '__aiter__'):
+                    raise ValueError("Workflow did not return a valid stream object.")
+                
+                # 3. 迭代流并转换为SSE，同时处理<think>标签
+                is_thinking = False
+                async for chunk in llm_stream:
+                    # 检查是否开始思考
+                    if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+                        if not is_thinking:
+                            is_thinking = True
+                            yield convert_chunk_to_sse_manual("<think>\n", chat_request.model, request_id)
+                    
+                    # 检查是否结束思考
+                    if is_thinking and hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
+                        is_thinking = False
+                        yield convert_chunk_to_sse_manual("\n</think>\n", chat_request.model, request_id)
+
+                    sse_chunk = convert_chunk_to_sse(chunk, chat_request.model, request_id)
                     if sse_chunk:
                         yield sse_chunk
                 
-                yield create_done_message()
+                # 确保think标签闭合
+                if is_thinking:
+                    yield convert_chunk_to_sse_manual("\n</think>\n", chat_request.model, request_id)
                 
+                # 4. 发送结束信号
+                yield create_done_message()
+
             except Exception as e:
+                import traceback
+                print(f"Error during streaming: {traceback.format_exc()}")
                 error_data = ResponseBuilder.create_error_response(
                     error_message=str(e),
                     error_type="workflow_error",
-                    error_code="WORKFLOW_ERROR"
+                    error_code="WORKFLOW_STREAM_ERROR"
                 )
                 error_chunk = f"data: {json.dumps(error_data)}\n\n"
                 yield error_chunk
                 yield create_done_message()
-        
-        return StreamingHandler.create_workflow_streaming_response(
-            request, convert_to_sse, request_id
-        )
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
     
     async def forward_models_request(self, request: Request):
         """Forward a models query request to the target LLM service."""

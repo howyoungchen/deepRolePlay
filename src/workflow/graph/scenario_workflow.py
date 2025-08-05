@@ -372,51 +372,8 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
                 temperature=0.7
             )
             
-            # 收集完整响应内容
-            reasoning_content = ""
-            content = ""
-            thinking_output = False
-            full_response_content = ""
-            chunk_count = 0
-            
-            async for chunk in response_stream:
-                chunk_count += 1
-                
-                # 检查chunk结构
-                if not chunk.choices or len(chunk.choices) == 0:
-                    continue
-                
-                delta = chunk.choices[0].delta
-                
-                # 处理推理内容
-                if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                    if not thinking_output:
-                        full_response_content += "<think>\n"
-                        thinking_output = True
-                    reasoning_content += delta.reasoning_content
-                    full_response_content += delta.reasoning_content
-                
-                # 处理正文内容
-                if hasattr(delta, 'content') and delta.content:
-                    if thinking_output:
-                        full_response_content += "\n</think>\n"
-                        thinking_output = False
-                    content += delta.content
-                    full_response_content += delta.content
-            
-            # 如果推理内容没有正常结束，补充结束标签
-            if thinking_output:
-                full_response_content += "\n</think>\n"
-            
-            # 创建兼容的响应对象
-            class StreamResponse:
-                def __init__(self, content, reasoning_content=""):
-                    self.content = content
-                    self.reasoning_content = reasoning_content
-                    self.response_metadata = {"chunks_processed": chunk_count}
-                    self.usage_metadata = {"streaming": True}
-            
-            llm_response = StreamResponse(full_response_content, reasoning_content)
+            # 直接返回流式响应对象
+            llm_response = response_stream
             
         else:
             # 非流式模式
@@ -457,34 +414,38 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
             "injected_messages": injected_messages,
             "injected_messages_count": len(injected_messages),
             "current_scenario": current_scenario,
-            "response_content_length": len(llm_response.content),
-            "has_reasoning_content": bool(getattr(llm_response, 'reasoning_content', '')),
+            "response_content_length": len(llm_response.content) if not stream else 0,
+            "has_reasoning_content": bool(getattr(llm_response, 'reasoning_content', '')) if not stream else False,
             "duration": duration,
             "model_used": final_model
         }
         
-        # 适配workflow_logger期望的格式，同时包含我们需要的信息
-        agent_response = {
-            # workflow_logger期望的messages字段（为了兼容性）
-            "messages": [],  # 空数组，因为我们使用自定义格式
-            
-            # 我们的自定义日志信息
-            "model_config": {
-                "model": final_model,
-                "base_url": base_url,
-                "temperature": 0.7,
-                "stream": stream
-            },
-            "input_messages": injected_messages,
-            "output_content": llm_response.content,
-            "reasoning_content": getattr(llm_response, 'reasoning_content', ''),
-            "usage_metadata": llm_response.usage_metadata,
-            
-            # 为了调试，添加执行状态
-            "execution_status": "completed",
-            "content_length": len(llm_response.content),
-            "has_reasoning": bool(getattr(llm_response, 'reasoning_content', ''))
-        }
+        # 在流式模式下，我们无法提前知道完整内容，因此日志记录简化
+        if stream:
+            agent_response = {
+                "messages": [],
+                "model_config": {"model": final_model, "base_url": base_url, "stream": True},
+                "input_messages": injected_messages,
+                "output_content": "[Streaming Response]",
+                "execution_status": "streaming_started"
+            }
+        else:
+            agent_response = {
+                "messages": [],
+                "model_config": {
+                    "model": final_model,
+                    "base_url": base_url,
+                    "temperature": 0.7,
+                    "stream": stream
+                },
+                "input_messages": injected_messages,
+                "output_content": llm_response.content,
+                "reasoning_content": getattr(llm_response, 'reasoning_content', ''),
+                "usage_metadata": llm_response.usage_metadata,
+                "execution_status": "completed",
+                "content_length": len(llm_response.content),
+                "has_reasoning": bool(getattr(llm_response, 'reasoning_content', ''))
+            }
         
         await workflow_logger.log_agent_execution(
             node_type="llm_forwarding",

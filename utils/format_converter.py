@@ -162,3 +162,67 @@ def extract_content_from_event(event: Dict[str, Any]) -> Optional[str]:
             return data.get('content') or data.get('output')
     
     return None
+def convert_chunk_to_sse(chunk: Any, model: str, request_id: str) -> Optional[str]:
+    """
+    将从LLM直接获取的流式chunk转换为OpenAI SSE格式
+    
+    Args:
+        chunk: LLM的流式响应块
+        model: 模型名称
+        request_id: 请求ID
+        
+    Returns:
+        SSE格式的字符串，如果chunk无效则返回None
+    """
+    if not hasattr(chunk, 'choices') or not chunk.choices:
+        return None
+        
+    delta = chunk.choices[0].delta
+    
+    # 提取内容
+    content = ""
+    if hasattr(delta, 'content') and delta.content:
+        content = delta.content
+    
+    # 提取推理内容
+    if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+        content = delta.reasoning_content
+
+    if not content:
+        return None
+
+    sse_data = {
+        "id": f"chatcmpl-{request_id}",
+        "object": "chat.completion.chunk",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{
+            "index": 0,
+            "delta": {
+                "role": "assistant",
+                "content": content
+            },
+            "finish_reason": None
+        }]
+    }
+    
+    return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
+def convert_chunk_to_sse_manual(content: str, model: str, request_id: str) -> str:
+    """
+    手动创建包含指定内容的SSE块
+    """
+    sse_data = {
+        "id": f"chatcmpl-{request_id}",
+        "object": "chat.completion.chunk",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [{
+            "index": 0,
+            "delta": {
+                "role": "assistant",
+                "content": content
+            },
+            "finish_reason": None
+        }]
+    }
+    return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
