@@ -341,11 +341,15 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         from langchain_openai import ChatOpenAI
         proxy_config = settings.proxy
         
+        # 使用proxy配置中的target_url作为转发LLM的base_url
+        # target_url: "https://api.deepseek.com/v1" 
+        base_url = proxy_config.target_url
+        
         # 构建LLM实例（使用请求中的API密钥和模型名称）
         llm = ChatOpenAI(
-            base_url=proxy_config.base_url,
-            model=model_name if model_name else proxy_config.model,
-            api_key=api_key if api_key else proxy_config.api_key,
+            base_url=base_url,
+            model=model_name if model_name else "deepseek-chat",
+            api_key=api_key if api_key else settings.agent.api_key,
             temperature=0.7,
             streaming=stream
         )
