@@ -322,8 +322,9 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
 
 
 async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
-    """LLM转发节点：整合情景注入和LLM调用"""
+    """LLM转发节点：使用原生OpenAI SDK，支持推理内容获取"""
     import time
+    from openai import AsyncOpenAI
     start_time = time.time()
     
     # 准备输入数据
@@ -332,17 +333,18 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
     model_name = state.get("model", "")
     stream = state.get("stream", False)
     
+    # 使用代理配置或默认配置
+    proxy_config = settings.proxy
+    base_url = proxy_config.target_url
+    final_api_key = api_key if api_key else settings.agent.api_key
+    final_model = model_name if model_name else "deepseek-chat"
+    
     inputs = {
-        "original_messages": original_messages,
-        "messages_count": len(original_messages),
-        "model": model_name,
+        "model": final_model,
         "stream": stream,
-        "has_api_key": bool(api_key),
-        "llm_config": {
-            "model": model_name if model_name else "deepseek-chat",
-            "temperature": 0.7,
-            "base_url": settings.proxy.target_url
-        }
+        "base_url": base_url,
+        "temperature": 0.7,
+        "messages_count": len(original_messages)
     }
     
     try:
@@ -350,49 +352,104 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         from utils.scenario_utils import read_scenario
         current_scenario = await read_scenario()
         
-        # 2. 情景注入（作为节点内的前置操作）
+        # 2. 情景注入
         from utils.messages_process import inject_scenario
-        injected_messages = inject_scenario(
-            original_messages, 
-            current_scenario
+        injected_messages = inject_scenario(original_messages, current_scenario)
+        
+        # 3. 创建OpenAI客户端
+        client = AsyncOpenAI(
+            api_key=final_api_key,
+            base_url=base_url
         )
         
-        # 3. 创建LLM模型（使用请求中的配置）
-        from langchain_openai import ChatOpenAI
-        proxy_config = settings.proxy
-        
-        # 使用proxy配置中的target_url作为转发LLM的base_url
-        # target_url: "https://api.deepseek.com/v1" 
-        base_url = proxy_config.target_url
-        
-        # 构建LLM实例（使用请求中的API密钥和模型名称）
-        llm = ChatOpenAI(
-            base_url=base_url,
-            model=model_name if model_name else "deepseek-chat",
-            api_key=api_key if api_key else settings.agent.api_key,
-            temperature=0.7,
-            streaming=stream
-        )
-        
-        # 4. 转换消息格式为LangChain格式
-        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-        langchain_messages = []
-        for msg in injected_messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "system":
-                langchain_messages.append(SystemMessage(content=content))
-            elif role == "user":
-                langchain_messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                langchain_messages.append(AIMessage(content=content))
-        
-        # 5. 调用LLM
-        response = await llm.ainvoke(langchain_messages)
-        
-        # 确保响应已正确等待完成
-        if hasattr(response, '__await__'):
-            response = await response
+        # 4. 调用LLM
+        if stream:
+            # 流式模式
+            response_stream = await client.chat.completions.create(
+                model=final_model,
+                messages=injected_messages,
+                stream=True,
+                temperature=0.7
+            )
+            
+            # 收集完整响应内容
+            reasoning_content = ""
+            content = ""
+            thinking_output = False
+            full_response_content = ""
+            chunk_count = 0
+            
+            async for chunk in response_stream:
+                chunk_count += 1
+                
+                # 检查chunk结构
+                if not chunk.choices or len(chunk.choices) == 0:
+                    continue
+                
+                delta = chunk.choices[0].delta
+                
+                # 处理推理内容
+                if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                    if not thinking_output:
+                        full_response_content += "<think>\n"
+                        thinking_output = True
+                    reasoning_content += delta.reasoning_content
+                    full_response_content += delta.reasoning_content
+                
+                # 处理正文内容
+                if hasattr(delta, 'content') and delta.content:
+                    if thinking_output:
+                        full_response_content += "\n</think>\n"
+                        thinking_output = False
+                    content += delta.content
+                    full_response_content += delta.content
+            
+            # 如果推理内容没有正常结束，补充结束标签
+            if thinking_output:
+                full_response_content += "\n</think>\n"
+            
+            # 创建兼容的响应对象
+            class StreamResponse:
+                def __init__(self, content, reasoning_content=""):
+                    self.content = content
+                    self.reasoning_content = reasoning_content
+                    self.response_metadata = {"chunks_processed": chunk_count}
+                    self.usage_metadata = {"streaming": True}
+            
+            llm_response = StreamResponse(full_response_content, reasoning_content)
+            
+        else:
+            # 非流式模式
+            response = await client.chat.completions.create(
+                model=final_model,
+                messages=injected_messages,
+                stream=False,
+                temperature=0.7
+            )
+            
+            # 构建完整响应内容
+            reasoning_content = getattr(response.choices[0].message, 'reasoning_content', '') or ""
+            main_content = response.choices[0].message.content or ""
+            
+            # 组合推理内容和正文内容
+            if reasoning_content:
+                full_content = f"<think>\n{reasoning_content}\n</think>\n{main_content}"
+            else:
+                full_content = main_content
+            
+            # 创建兼容的响应对象
+            class NonStreamResponse:
+                def __init__(self, content, reasoning_content=""):
+                    self.content = content
+                    self.reasoning_content = reasoning_content
+                    self.response_metadata = {"model": final_model}
+                    self.usage_metadata = {
+                        "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                        "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                        "total_tokens": response.usage.total_tokens if response.usage else 0
+                    }
+            
+            llm_response = NonStreamResponse(full_content, reasoning_content)
         
         duration = time.time() - start_time
         
@@ -400,17 +457,33 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
             "injected_messages": injected_messages,
             "injected_messages_count": len(injected_messages),
             "current_scenario": current_scenario,
-            "response_content_length": len(response.content) if hasattr(response, 'content') else 0,
+            "response_content_length": len(llm_response.content),
+            "has_reasoning_content": bool(getattr(llm_response, 'reasoning_content', '')),
             "duration": duration,
-            "model_used": model_name if model_name else "deepseek-chat"
+            "model_used": final_model
         }
         
-        # 记录日志
+        # 适配workflow_logger期望的格式，同时包含我们需要的信息
         agent_response = {
-            "response": response.content if hasattr(response, 'content') else str(response),
-            "response_metadata": response.response_metadata if hasattr(response, 'response_metadata') else {},
-            "usage_metadata": response.usage_metadata if hasattr(response, 'usage_metadata') else {},
-            "full_response": str(response)
+            # workflow_logger期望的messages字段（为了兼容性）
+            "messages": [],  # 空数组，因为我们使用自定义格式
+            
+            # 我们的自定义日志信息
+            "model_config": {
+                "model": final_model,
+                "base_url": base_url,
+                "temperature": 0.7,
+                "stream": stream
+            },
+            "input_messages": injected_messages,
+            "output_content": llm_response.content,
+            "reasoning_content": getattr(llm_response, 'reasoning_content', ''),
+            "usage_metadata": llm_response.usage_metadata,
+            
+            # 为了调试，添加执行状态
+            "execution_status": "completed",
+            "content_length": len(llm_response.content),
+            "has_reasoning": bool(getattr(llm_response, 'reasoning_content', ''))
         }
         
         await workflow_logger.log_agent_execution(
@@ -423,7 +496,7 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         
         return {
             "injected_messages": injected_messages,
-            "llm_response": response
+            "llm_response": llm_response
         }
         
     except Exception as e:
@@ -439,15 +512,18 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
             error_details=error_details
         )
         
-        try:
-            print(f"LLM forwarding node execution failed: {str(e)}")
-        except UnicodeEncodeError:
-            print(f"LLM forwarding node execution failed: [encoding error in message]")
+        print(f"LLM forwarding node execution failed: {str(e)}")
+        
         # 返回错误响应
-        from langchain_core.messages import AIMessage
+        class ErrorResponse:
+            def __init__(self, content):
+                self.content = content
+                self.response_metadata = {}
+                self.usage_metadata = {}
+        
         return {
             "injected_messages": original_messages,
-            "llm_response": AIMessage(content=f"Error: {str(e)}")
+            "llm_response": ErrorResponse(f"Error: {str(e)}")
         }
 
 

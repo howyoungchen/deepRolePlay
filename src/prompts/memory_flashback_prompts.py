@@ -129,5 +129,5 @@ MEMORY_FLASHBACK_PROMPT = """
 """
 
 MEMORY_FLASHBACK_USER_TEMPLATE = """
-使用sequential_thinking工具思考10m长的竹竿可以通过2*2的门吗？最多调用工具5次
+使用sequential_thinking工具思考10m长的竹竿可以通过2*2的门吗？最多调用工具1次
 """

@@ -141,5 +141,5 @@ SCENARIO_UPDATER_PROMPT="""
 
 
 SCENARIO_UPDATER_USER_TEMPLATE="""
-使用sequential_thinking工具思考9.11大还是9.9大？最多调用工具5次
+使用sequential_thinking工具思考9.11大还是9.9大？最多调用工具1次
 """

@@ -103,11 +103,12 @@ class WorkflowStreamConverter:
         data = event.get("data", {})
         
         # Node start
-        if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater"]:
+        if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater", "llm_forwarding"]:
             self.current_node = name
             node_name_map = {
                 "memory_flashback": "Memory Flashback",
-                "scenario_updater": "Scenario Updater"
+                "scenario_updater": "Scenario Updater",
+                "llm_forwarding": "LLM Forwarding"
             }
             content = f"🔄 Starting node {node_name_map.get(name, name)}...\n"
             return self.create_sse_data(content, "node_start")
@@ -162,20 +163,32 @@ class WorkflowStreamConverter:
             return self.create_sse_data(content, "tool_end")
         
         # Node complete
-        if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater"]:
+        if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater", "llm_forwarding"]:
             node_output = data.get("output", {})
             
             node_name_map = {
                 "memory_flashback": "Memory Flashback",
-                "scenario_updater": "Scenario Updater"
+                "scenario_updater": "Scenario Updater",
+                "llm_forwarding": "LLM Forwarding"
             }
             
             content = f"✅ Node {node_name_map.get(name, name)} complete\n"
-            for key, value in node_output.items():
-                if isinstance(value, str) and len(value) > 100:
-                    content += f"  {key}: {value[:100]}...\n"
-                else:
-                    content += f"  {key}: {value}\n"
+            
+            # 对于llm_forwarding节点，特殊处理输出格式
+            if name == "llm_forwarding":
+                llm_response = node_output.get("llm_response")
+                if llm_response and hasattr(llm_response, 'content'):
+                    response_preview = llm_response.content[:200] + "..." if len(llm_response.content) > 200 else llm_response.content
+                    content += f"  Response: {response_preview}\n"
+                if hasattr(llm_response, 'reasoning_content') and llm_response.reasoning_content:
+                    content += f"  Has reasoning content: Yes\n"
+            else:
+                for key, value in node_output.items():
+                    if isinstance(value, str) and len(value) > 100:
+                        content += f"  {key}: {value[:100]}...\n"
+                    else:
+                        content += f"  {key}: {value}\n"
+            
             content += "\n" + "-" * 50 + "\n"
             
             self.current_node = None

@@ -63,6 +63,37 @@ class WorkflowLogger:
         }
         
         try:
+            # 检查是否是llm_forwarding节点的自定义格式
+            if "model_config" in response and "input_messages" in response:
+                # 这是llm_forwarding节点的响应，直接返回结构化数据
+                parsed = {
+                    "model_config": response.get("model_config", {}),
+                    "input_messages": response.get("input_messages", []),
+                    "output_content": response.get("output_content", ""),
+                    "reasoning_content": response.get("reasoning_content", ""),
+                    "usage_metadata": response.get("usage_metadata", {}),
+                    "execution_status": response.get("execution_status", "unknown"),
+                    "content_length": response.get("content_length", 0),
+                    "has_reasoning": response.get("has_reasoning", False),
+                    "messages_full": []  # 兼容性字段
+                }
+                
+                # 为messages_full字段填充input_messages信息
+                for i, msg in enumerate(response.get("input_messages", [])):
+                    msg_data = {
+                        "index": i,
+                        "type": "dict" if isinstance(msg, dict) else type(msg).__name__,
+                        "content": msg.get("content", "") if isinstance(msg, dict) else str(msg),
+                        "role": msg.get("role", "") if isinstance(msg, dict) else "",
+                        "name": "",
+                        "tool_calls": [],
+                        "tool_call_id": ""
+                    }
+                    parsed["messages_full"].append(msg_data)
+                
+                return parsed
+            
+            # 原有的messages处理逻辑（用于其他节点）
             messages = response.get("messages", [])
             
             if messages:
