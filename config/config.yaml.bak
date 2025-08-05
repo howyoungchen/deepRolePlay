@@ -1,42 +1,76 @@
-# AI Role-Playing Agent System Configuration File
+# ====================================================================
+# DeepRolePlay Configuration File - Beginner's Guide
+# ====================================================================
+# 
+# 🤔 What are "Forwarding LLM" and "Agent LLM"?
+# 
+# 【Forwarding LLM】= The AI model you actually want to chat with
+# • This is the AI that ultimately chats with users, like DeepSeek, Claude, GPT, etc.
+# • The API Key you fill in SillyTavern is for this model
+# • Configuration location: proxy section below
+# 
+# 【Agent LLM】= Behind-the-scenes intelligent assistant AI model  
+# • Responsible for "memory flashback" and "scenario update", users don't see its responses
+# • Recommend using cheap and fast models, like Gemini 2.5 Flash (large free quota)
+# • Configuration location: agent section below
+# 
+# 💡 Example:
+# - Forwarding LLM: DeepSeek (cheap, chats with users) → fill base_url in proxy section, api_key and other configs in your frontend. Frontend should use base_url: http://localhost:6666/api/v1
+# - Agent LLM: Gemini (free, background work) → fill in agent section
+# - You need two different API Keys!
+# 
+# 🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forwarding LLM generates response
+# ====================================================================
 
-# API Proxy Related Configuration
+# 【API Proxy Configuration】Forward to target LLM service
 proxy:
+  # Target LLM service address | Controls request forwarding destination | Need to change: Fill in your LLM service API address
   target_url: "https://api.deepseek.com/v1"
+  # HTTP request timeout (seconds) | Controls request wait duration | Usually no need to change: 30 seconds is sufficient
   timeout: 30
-  debug_mode: false  # 启用调试模式，跳过工作流和LLM调用，直接返回带图片的测试消息
+  # Debug mode switch | Controls whether to skip workflow and return test message directly | Usually no need to change: false for normal operation
+  debug_mode: false
 
-# Scenario Management Related Configuration
+# 【Scenario File Configuration】Character state storage
 scenario:
+  # Scenario file storage path | Controls character state save location | Usually no need to change: auto-creates directory
   file_path: "./scenarios/scenario.txt"
 
-# LangGraph Workflow Configuration
+# 【Workflow Control Configuration】Agent execution parameters
 langgraph:
+  # Number of history messages passed to Agent | Controls context length and token consumption | Adjustable: 3-15 messages, affects memory effectiveness and cost
   max_history_length: 7
-  history_ai_message_offset: 1  # Start counting history from the Nth-to-last AI message (1=all messages before the last AI message are history)
-  only_forward: false  # 当为true时跳过记忆闪回和情景更新节点，直接转发到LLM
+  # History message starting offset | Controls message calculation starting point | Usually no need to change: technical parameter
+  history_ai_message_offset: 1
+  # Fast forward mode | Controls whether to skip Agent and forward directly | Usually no need to change: false for normal operation
+  only_forward: false
 
-# Agent Configuration
+# 【Agent Configuration】AI model for memory flashback and scenario update
 agent:
-  # Model Configuration
+  # AI model name | Controls which AI model to use | Recommended adjustment: google/gemini-2.5-flash
   model: "google/gemini-2.5-flash"
+  # Generation randomness (0-1) | Controls answer creativity | Adjustable: 0.1 stable, 0.7 creative, affects consistency
   temperature: 0.1
+  # API service provider address | Controls model call interface | Need to change: choose corresponding service provider based on model
   base_url: "https://openrouter.ai/api/v1"
-  api_key: "YOUR_API_KEY_HERE"
+  # API access key | Controls service authentication | Must change: fill in valid key from corresponding service provider
+  api_key: "Replace this with your API key"
+  # Maximum output tokens | Controls single generation length limit | Usually no need to change: 8192 sufficient for most scenarios
   max_tokens: 8192
+  # Sampling probability threshold (0-1) | Controls vocabulary selection range | Usually no need to change: 0.9 ensures diversity
   top_p: 0.9
-  
-  # Debugging and Loop Control
+  # Agent debug information | Controls whether to show detailed execution process | Change when debugging: true shows process, false for normal operation
   debug: false
+  # Maximum execution rounds | Controls upper limit to prevent infinite loops | Usually no need to change: 40 rounds sufficient for complex tasks
   max_iterations: 40
-  
-  
-  # Timeout Settings
+  # Single request timeout (seconds) | Controls Agent call wait duration | Adjustable: increase to 180 for slow networks
   timeout: 120
 
-  
-# Server Configuration
+# 【Server Configuration】DeepRolePlay service network settings
 server:
+  # Listen IP address | Controls external access permissions | Usually no need to change: 0.0.0.0 allows LAN access
   host: "0.0.0.0"
+  # Service port number | Controls frontend connection port | Adjustable: auto-increments if occupied, frontend needs corresponding modification
   port: 6666
+  # Code hot reload | Controls automatic restart during development | Usually no need to change: false avoids accidental restarts in production
   reload: false

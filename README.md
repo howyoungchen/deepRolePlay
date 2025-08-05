@@ -135,26 +135,37 @@ uv pip install -r requirements.txt
 ```yaml
 # API代理配置 - 转发目标
 proxy:
-  target_url: "https://api.deepseek.com/v1"                      # 你要转发的API地址
-  timeout: 60                                                     # 请求超时时间（秒）
-
-# 智能体配置 - Agent 使用的模型（必须是Gemini 2.5 Flash）
-agent:
-  model: "gemini-2.5-flash"                                       # 必须使用 Gemini 2.5 Flash
-  base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API地址
-  api_key: "your-gemini-api-key"                                  # 填入你的 Gemini API Key
-  temperature: 0.7                                                # 生成温度（0-1）
-  max_iterations: 25                                              # 最大迭代次数
+  target_url: "https://api.deepseek.com/v1"        # 你要转发的API地址
+  timeout: 30                                       # 请求超时时间（秒）
+  debug_mode: false                                 # 调试模式开关
 
 # 情景管理
 scenario:
-  file_path: "./scenarios/scenario.txt"      # 情景文件路径
-  update_enabled: true                        # 是否启用自动更新
+  file_path: "./scenarios/scenario.txt"            # 情景文件路径
+
+# 工作流控制配置
+langgraph:
+  max_history_length: 7                            # 传递给Agent的历史消息数量
+  history_ai_message_offset: 1                     # 历史消息计算起点
+  only_forward: false                               # 快速模式开关
+
+# 智能体配置 - Agent 使用的模型（推荐Gemini 2.5 Flash）
+agent:
+  model: "google/gemini-2.5-flash"                 # 推荐使用 Gemini 2.5 Flash
+  base_url: "https://openrouter.ai/api/v1"         # API服务地址（推荐OpenRouter）
+  api_key: "your-api-key"                          # 填入你的 API Key
+  temperature: 0.1                                 # 生成温度（0-1）
+  max_tokens: 8192                                 # 最大输出token数
+  top_p: 0.9                                       # Top-p采样参数
+  debug: false                                     # 调试模式
+  max_iterations: 40                               # 最大处理轮次
+  timeout: 120                                     # 单次请求超时时间
 
 # 服务器配置
 server:
   host: "0.0.0.0"
   port: 6666
+  reload: false                                    # 热重载开关
 ```
 
 ### 3. 启动服务
@@ -185,7 +196,7 @@ http://localhost:6666/v1
 使用 PyInstaller 打包为可执行文件：
 
 ```bash
-pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" main.py
+pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" --add-data "config;config" main.py
 ```
 
 打包后在 `dist/` 目录下会生成 `DeepRolePlay.exe`，连同配置文件一起发布给用户。
