@@ -381,6 +381,10 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         # 5. 调用LLM
         response = await llm.ainvoke(langchain_messages)
         
+        # 确保响应已正确等待完成
+        if hasattr(response, '__await__'):
+            response = await response
+        
         duration = time.time() - start_time
         
         outputs = {

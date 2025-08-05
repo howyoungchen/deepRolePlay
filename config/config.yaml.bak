@@ -10,14 +10,11 @@ proxy:
 scenario:
   file_path: "./scenarios/scenario.txt"
 
-# Workflow Control Configuration
-workflow:
-  enabled: true  # Whether to enable the workflow, default is true
-
 # LangGraph Workflow Configuration
 langgraph:
   max_history_length: 7
   history_ai_message_offset: 1  # Start counting history from the Nth-to-last AI message (1=all messages before the last AI message are history)
+  only_forward: false  # 当为true时跳过记忆闪回和情景更新节点，直接转发到LLM
 
 # Agent Configuration
 agent:
