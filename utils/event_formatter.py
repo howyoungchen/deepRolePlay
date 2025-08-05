@@ -50,6 +50,9 @@ class EventFormatter:
             # 对llm_forwarding节点不显示开始信息
             if name != "llm_forwarding":
                 content = f"\n🔄 Update from node {name}:\n\n"
+                # 如果是memory_flashback节点开始，添加<think>标记
+                if name == "memory_flashback":
+                    content = "<think>\n" + content
                 return self.create_sse_chunk(content)
             return None
         
@@ -176,6 +179,9 @@ class EventFormatter:
                 else:
                     content += f"  {key}: {value}\n"
             content += "-" * 40 + "\n"
+            # 如果是scenario_updater节点结束，添加</think>标记
+            if name == "scenario_updater":
+                content += "</think>\n"
             self.current_node = None
             return self.create_sse_chunk(content)
         
