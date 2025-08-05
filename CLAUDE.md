@@ -108,6 +108,19 @@ asyncio.run(test_memory_only())
 "
 ```
 
+### 单独测试HTTP代理服务
+```bash
+# 测试代理服务（需要已启动服务）
+curl -X POST http://localhost:6666/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": false
+  }'
+```
+
 ### 指定配置文件启动
 ```bash
 python main.py --config_path /path/to/config.yaml
@@ -232,3 +245,22 @@ LangGraph工作流(scenario_workflow) →
 - 情景更新Agent使用文件操作工具管理scenario文件
 - 两个Agent共享sequential_thinking工具进行推理
 - debug模式可输出详细的Agent执行信息
+
+## 重要机制说明
+
+### 端口自动递增机制
+系统启动时会自动检测配置端口是否被占用：
+- 从config.yaml中的端口开始检测
+- 如被占用则自动+1，最多尝试20个端口
+- 最终使用的端口会在终端输出中显示
+- 避免手动解决端口冲突问题
+
+### 角色切换和缓存清理
+- 用户发送"deeproleplay"消息可清除历史缓存
+- 重新开始新的角色扮演会话
+- 避免不同角色间的情景混淆
+
+### 配置文件热重载
+- 支持在运行时修改config.yaml
+- 部分配置项需要重启服务生效
+- 建议使用uvicorn的--reload选项进行开发调试

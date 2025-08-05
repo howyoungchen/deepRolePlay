@@ -60,7 +60,7 @@ class EventFormatter:
                 if not self.ai_message_started:
                     # 对llm_forwarding节点不显示AI消息标题
                     if self.current_node != "llm_forwarding":
-                        header = "================================== Ai Message ==================================\n"
+                        header = "=========Ai Message=========\n"
                         header += f"Name: {self.current_node}_agent\n\n"
                         self.ai_message_started = True
                         return self.create_sse_chunk(header)
@@ -143,7 +143,7 @@ class EventFormatter:
             else:
                 # 其他工具保持原有的详细显示
                 content = f"\n🔧 Update from node tools:\n\n"
-                content += "================================= Tool Message =================================\n"
+                content += "=========Tool Message=========\n"
                 content += f"Name: {tool_name}\n\n"
                 
                 if isinstance(tool_output, str):
@@ -175,7 +175,7 @@ class EventFormatter:
                     content += f"  {key}: {value[:100]}... (truncated)\n"
                 else:
                     content += f"  {key}: {value}\n"
-            content += "-" * 80 + "\n"
+            content += "-" * 40 + "\n"
             self.current_node = None
             return self.create_sse_chunk(content)
         
