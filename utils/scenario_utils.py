@@ -4,7 +4,6 @@ Utility functions for reading and writing scenario files.
 import os
 import aiofiles
 from config.manager import settings
-from utils.logger import request_logger
 
 
 def get_scenario_file_path() -> str:
@@ -36,7 +35,7 @@ async def read_scenario() -> str:
         return content.strip()
         
     except Exception as e:
-        await request_logger.log_error(f"Failed to read scenario file: {str(e)}")
+        print(f"Error: Failed to read scenario file: {str(e)}")
         # Return default scenario
         return "This is the beginning of a new conversation."
 
@@ -58,10 +57,10 @@ async def write_scenario(content: str) -> None:
         async with aiofiles.open(scenario_file_path, 'w', encoding='utf-8') as f:
             await f.write(content)
             
-        await request_logger.log_info(f"Scenario file saved successfully: {scenario_file_path}")
+        pass
         
     except Exception as e:
-        await request_logger.log_error(f"Failed to save scenario file: {str(e)}")
+        print(f"Error: Failed to save scenario file: {str(e)}")
         raise
 
 

@@ -17,7 +17,6 @@ from .proxy_utils import (
     DirectoryUtils,
     SpecialRequestHandler
 )
-from utils.serialization_helper import make_response_serializable
 
 
 class ChatMessage(BaseModel):

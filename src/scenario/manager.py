@@ -8,7 +8,6 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from config.manager import settings
-from utils.logger import logger
 
 
 class ScenarioManager:
@@ -83,7 +82,7 @@ class ScenarioManager:
                 yield event
     
         except Exception as e:
-            logger.error(f"Failed to update scenario in streaming mode: {str(e)}")
+            print(f"Error: Failed to update scenario in streaming mode: {str(e)}")
             raise RuntimeError(f"Failed to update scenario in streaming mode: {str(e)}")
 
 

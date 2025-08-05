@@ -28,9 +28,6 @@ class ProxyConfig(BaseModel):
             return f"{self.target_url.rstrip('/')}/models"
 
 
-class SystemConfig(BaseModel):
-    log_level: str = "INFO"
-    log_dir: str = "./logs"
 
 
 class ServerConfig(BaseModel):
@@ -77,7 +74,6 @@ class Settings(BaseSettings):
     )
     
     proxy: ProxyConfig = ProxyConfig()
-    system: SystemConfig = SystemConfig()
     server: ServerConfig = ServerConfig()
     scenario: ScenarioConfig = ScenarioConfig()
     langgraph: LangGraphConfig = LangGraphConfig()

@@ -12,7 +12,6 @@ from typing import Dict, Any, Optional, List, Callable, AsyncGenerator
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse, JSONResponse
 from config.manager import settings
-from utils.logger import logger
 
 
 class AuthUtils:
@@ -262,16 +261,7 @@ class LoggingUtils:
         request_id: str
     ):
         """记录请求响应日志"""
-        logger.info(
-            "Request handled",
-            request_id=request_id,
-            method=request.method,
-            url=str(request.url),
-            status_code=response.status_code if response else "N/A",
-            duration=duration,
-            request_body=request_body,
-            response_body=response_body
-        )
+        pass
 
 
 class DirectoryUtils:

@@ -330,10 +330,16 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
     stream = state.get("stream", False)
     
     inputs = {
+        "original_messages": original_messages,
         "messages_count": len(original_messages),
         "model": model_name,
         "stream": stream,
-        "has_api_key": bool(api_key)
+        "has_api_key": bool(api_key),
+        "llm_config": {
+            "model": model_name if model_name else "deepseek-chat",
+            "temperature": 0.7,
+            "base_url": settings.proxy.target_url
+        }
     }
     
     try:
@@ -388,16 +394,26 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         duration = time.time() - start_time
         
         outputs = {
+            "injected_messages": injected_messages,
             "injected_messages_count": len(injected_messages),
+            "current_scenario": current_scenario,
             "response_content_length": len(response.content) if hasattr(response, 'content') else 0,
-            "duration": duration
+            "duration": duration,
+            "model_used": model_name if model_name else "deepseek-chat"
         }
         
         # 记录日志
+        agent_response = {
+            "response": response.content if hasattr(response, 'content') else str(response),
+            "response_metadata": response.response_metadata if hasattr(response, 'response_metadata') else {},
+            "usage_metadata": response.usage_metadata if hasattr(response, 'usage_metadata') else {},
+            "full_response": str(response)
+        }
+        
         await workflow_logger.log_agent_execution(
             node_type="llm_forwarding",
             inputs=inputs,
-            agent_response={"response": response.content if hasattr(response, 'content') else str(response)},
+            agent_response=agent_response,
             outputs=outputs,
             duration=duration
         )
