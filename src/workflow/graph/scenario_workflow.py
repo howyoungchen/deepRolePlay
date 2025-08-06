@@ -335,15 +335,17 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
     
     # 使用代理配置或默认配置
     proxy_config = settings.proxy
+    agent_config = settings.agent
     base_url = proxy_config.target_url
-    final_api_key = api_key if api_key else settings.agent.api_key
+    final_api_key = api_key if api_key else agent_config.api_key
     final_model = model_name if model_name else "deepseek-chat"
+    final_temperature = agent_config.temperature
     
     inputs = {
         "model": final_model,
         "stream": stream,
         "base_url": base_url,
-        "temperature": 0.7,
+        "temperature": final_temperature,
         "messages_count": len(original_messages)
     }
     
@@ -364,16 +366,62 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         
         # 4. 调用LLM
         if stream:
-            # 流式模式
+            # 流式模式 - 创建包装的生成器来处理<think>标签
             response_stream = await client.chat.completions.create(
                 model=final_model,
                 messages=injected_messages,
                 stream=True,
-                temperature=0.7
+                temperature=final_temperature
             )
             
-            # 直接返回流式响应对象
-            llm_response = response_stream
+            # 创建处理<think>标签的包装生成器
+            async def reasoning_stream_wrapper():
+                reasoning_started = False
+                content_started = False
+                
+                async for chunk in response_stream:
+                    if not chunk.choices:
+                        yield chunk
+                        continue
+                        
+                    delta = chunk.choices[0].delta
+                    
+                    # 处理推理过程
+                    if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                        if not reasoning_started:
+                            # 创建一个包含<think>标签的新chunk
+                            from copy import deepcopy
+                            think_start_chunk = deepcopy(chunk)
+                            think_start_chunk.choices[0].delta.content = "<think>"
+                            if hasattr(think_start_chunk.choices[0].delta, 'reasoning_content'):
+                                think_start_chunk.choices[0].delta.reasoning_content = None
+                            yield think_start_chunk
+                            reasoning_started = True
+                        
+                        # 创建包含推理内容的chunk (将reasoning_content转为content)
+                        from copy import deepcopy
+                        reasoning_chunk = deepcopy(chunk)
+                        reasoning_chunk.choices[0].delta.content = delta.reasoning_content
+                        reasoning_chunk.choices[0].delta.reasoning_content = None
+                        yield reasoning_chunk
+                    
+                    # 处理正文回答
+                    elif hasattr(delta, "content") and delta.content:
+                        if reasoning_started and not content_started:
+                            # 创建包含</think>结束标签的chunk
+                            from copy import deepcopy
+                            think_end_chunk = deepcopy(chunk)
+                            think_end_chunk.choices[0].delta.content = "</think>\n"
+                            yield think_end_chunk
+                            content_started = True
+                        
+                        # 直接传递原始chunk
+                        yield chunk
+                    else:
+                        # 传递其他chunk（如finish_reason等）
+                        yield chunk
+            
+            llm_response = reasoning_stream_wrapper()
             
         else:
             # 非流式模式
@@ -381,7 +429,7 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
                 model=final_model,
                 messages=injected_messages,
                 stream=False,
-                temperature=0.7
+                temperature=final_temperature
             )
             
             # 构建完整响应内容
@@ -435,7 +483,7 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
                 "model_config": {
                     "model": final_model,
                     "base_url": base_url,
-                    "temperature": 0.7,
+                    "temperature": final_temperature,
                     "stream": stream
                 },
                 "input_messages": injected_messages,

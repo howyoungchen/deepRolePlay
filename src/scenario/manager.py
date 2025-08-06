@@ -25,49 +25,39 @@ class ScenarioManager:
         os.makedirs(os.path.dirname(self.scenario_file_path), exist_ok=True)
     
     
-    async def update_scenario(self, messages: List[Dict[str, Any]]):
+    async def update_scenario(self, workflow_input: Dict[str, Any]):
         """
-        Synchronously updates the scenario, waits for completion, and returns the updated scenario content.
+        Synchronously updates the scenario, waits for completion, and returns the LLM response.
         
         Args:
-            messages: The original list of messages.
+            workflow_input: Complete workflow input including messages, api_key, model, etc.
             
         Returns:
-            The updated scenario content.
+            The LLM response object.
         """
         try:
-            # Get the current scenario content.
-            from utils.scenario_utils import read_scenario
-            current_scenario = await read_scenario()
-            
             # Dynamically import the new workflow to avoid circular dependencies.
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
             # Create and invoke the workflow.
             workflow = create_scenario_workflow()
-            await workflow.ainvoke({
-                "current_scenario": current_scenario,
-                "messages": messages
-            })
+            result = await workflow.ainvoke(workflow_input)
+            return result.get("llm_response")
     
         except Exception as e:
             raise RuntimeError(f"Failed to update scenario: {str(e)}")
     
-    async def update_scenario_streaming(self, messages: List[Dict[str, Any]]):
+    async def update_scenario_streaming(self, workflow_input: Dict[str, Any]):
         """
         Updates the scenario in a streaming fashion, returning streaming events from the workflow execution.
         
         Args:
-            messages: The original list of messages.
+            workflow_input: Complete workflow input including messages, api_key, model, etc.
             
         Yields:
             Streaming events from the workflow execution.
         """
         try:
-            # Get the current scenario content.
-            from utils.scenario_utils import read_scenario
-            current_scenario = await read_scenario()
-            
             # Dynamically import the new workflow to avoid circular dependencies.
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
@@ -75,10 +65,7 @@ class ScenarioManager:
             workflow = create_scenario_workflow()
             
             # Use astream_events to get streaming events.
-            async for event in workflow.astream_events({
-                "current_scenario": current_scenario,
-                "messages": messages
-            }, version="v2"):
+            async for event in workflow.astream_events(workflow_input, version="v2"):
                 yield event
     
         except Exception as e:

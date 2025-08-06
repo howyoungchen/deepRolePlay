@@ -66,14 +66,12 @@ class ProxyService:
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """完全基于工作流的非流式请求处理"""
+        """使用ScenarioManager的非流式请求处理"""
         request_id = str(uuid.uuid4())
         start_time = time.time()
         
-        from src.workflow.graph.scenario_workflow import create_scenario_workflow
+        from src.scenario.manager import scenario_manager
         from utils.format_converter import convert_final_response
-        
-        workflow = create_scenario_workflow()
         
         try:
             workflow_input = WorkflowHelper.prepare_workflow_input(
@@ -81,8 +79,7 @@ class ProxyService:
             )
             workflow_input["stream"] = False
             
-            result = await workflow.ainvoke(workflow_input)
-            llm_response = result.get("llm_response")
+            llm_response = await scenario_manager.update_scenario(workflow_input)
             
             # 确保llm_response不是协程对象
             if hasattr(llm_response, '__await__'):
@@ -116,55 +113,34 @@ class ProxyService:
         request: Request,
         chat_request: ChatCompletionRequest
     ):
-        """完全基于工作流的流式请求处理（新版）"""
+        """使用ScenarioManager的流式请求处理"""
         request_id = str(uuid.uuid4())
         
-        from src.workflow.graph.scenario_workflow import create_scenario_workflow
-        from utils.format_converter import convert_chunk_to_sse, create_done_message, convert_chunk_to_sse_manual
-        
-        workflow = create_scenario_workflow()
+        from src.scenario.manager import scenario_manager
+        from utils.format_converter import convert_chunk_to_sse, create_done_message
         
         async def stream_generator():
             """生成器，用于处理工作流并流式传输LLM响应"""
             try:
-                # 1. 准备并调用工作流
+                # 1. 准备工作流输入
                 workflow_input = WorkflowHelper.prepare_workflow_input(
                     request, chat_request, request_id, current_scenario=""
                 )
                 workflow_input["stream"] = True
                 
-                # 使用ainvoke获取最终结果，其中包含流对象
-                result = await workflow.ainvoke(workflow_input)
+                # 2. 使用ScenarioManager的流式方法
+                async for event in scenario_manager.update_scenario_streaming(workflow_input):
+                    # 监听ChatOpenAI模型的流式输出事件
+                    if (event.get("event") == "on_chat_model_stream" and 
+                        event.get("name") == "ChatOpenAI" and
+                        event.get("data", {}).get("chunk")):
+                        
+                        chunk = event["data"]["chunk"]
+                        sse_chunk = convert_chunk_to_sse(chunk, chat_request.model, request_id)
+                        if sse_chunk:
+                            yield sse_chunk
                 
-                # 2. 从结果中提取流
-                llm_stream = result.get("llm_response")
-                
-                if not llm_stream or not hasattr(llm_stream, '__aiter__'):
-                    raise ValueError("Workflow did not return a valid stream object.")
-                
-                # 3. 迭代流并转换为SSE，同时处理<think>标签
-                is_thinking = False
-                async for chunk in llm_stream:
-                    # 检查是否开始思考
-                    if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
-                        if not is_thinking:
-                            is_thinking = True
-                            yield convert_chunk_to_sse_manual("<think>\n", chat_request.model, request_id)
-                    
-                    # 检查是否结束思考
-                    if is_thinking and hasattr(chunk.choices[0].delta, 'content') and chunk.choices[0].delta.content:
-                        is_thinking = False
-                        yield convert_chunk_to_sse_manual("\n</think>\n", chat_request.model, request_id)
-
-                    sse_chunk = convert_chunk_to_sse(chunk, chat_request.model, request_id)
-                    if sse_chunk:
-                        yield sse_chunk
-                
-                # 确保think标签闭合
-                if is_thinking:
-                    yield convert_chunk_to_sse_manual("\n</think>\n", chat_request.model, request_id)
-                
-                # 4. 发送结束信号
+                # 3. 发送结束信号
                 yield create_done_message()
 
             except Exception as e:
