@@ -68,26 +68,32 @@ uvicorn main:app --host 0.0.0.0 --port 6666 --reload
 
 ### 安装依赖
 ```bash
-# 使用pip安装
-pip install -r requirements.txt
-
 # 使用uv安装（推荐）
 uv pip install -r requirements.txt
+
+# 验证关键依赖是否正确安装
+PYTHONPATH=. uv run python -c "import langgraph; print('langgraph imported successfully')"
 ```
 
 ### 测试工作流
 ```bash
 # 测试完整工作流（包含记忆闪回和情景更新）
-python src/workflow/graph/scenario_workflow.py
+PYTHONPATH=. uv run python src/workflow/graph/scenario_workflow.py
 
-# 测试单个工作流组件
-PYTHONPATH=. python src/workflow/graph/scenario_workflow.py
+# 测试重构后的工作流
+PYTHONPATH=. uv run python unit_test_script/test_refactored_workflow.py
+
+# 测试LLM转发和流式功能
+PYTHONPATH=. uv run python unit_test_script/test_forward_llm_streaming.py
+
+# 调试工具：检查AIMessageChunk内容
+PYTHONPATH=. uv run python debug_chunk_content.py
 ```
 
 ### 测试单个Agent功能
 ```bash
 # 测试记忆闪回Agent（需要先配置API密钥）
-PYTHONPATH=. python -c "
+PYTHONPATH=. uv run python -c "
 from src.workflow.graph.scenario_updater import MemoryFlashbackAgent
 import asyncio
 
@@ -106,6 +112,19 @@ async def test_memory_only():
 
 asyncio.run(test_memory_only())
 "
+```
+
+### 单独测试HTTP代理服务
+```bash
+# 测试代理服务（需要已启动服务）
+curl -X POST http://localhost:6666/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": false
+  }'
 ```
 
 ### 指定配置文件启动
@@ -143,9 +162,11 @@ pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src"
 - 工作流使用异步执行，所有节点支持流式事件输出
 - 情景文件路径动态获取，由`utils/scenario_utils.py`管理
 - 配置系统支持运行时通过命令行参数覆盖
-- 记忆闪回使用中文Wikipedia API，返回压缩的相关信息
+- 记忆闪回使用Wikipedia API（可配置中英文），返回压缩的相关信息
 - 所有API调用和工具执行都在LangGraph代理框架内进行
 - 日志系统使用结构化JSON格式，便于后续分析
+- **测试时务必设置PYTHONPATH环境变量**，避免模块导入错误
+- 使用`timeout`命令包装测试脚本，避免长时间阻塞（推荐30-60秒）
 
 ## 调试和日志
 
@@ -179,6 +200,21 @@ python -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
 
 ### 端口冲突处理
 系统会自动检测端口占用，从配置的端口开始递增查找可用端口（最多尝试20个）。实际使用的端口会在终端输出中显示。
+
+### 常见开发调试
+```bash
+# 检查端口占用情况
+lsof -i :6666
+
+# 终止占用端口的进程
+pkill -f "python main.py"
+
+# 清理scenario文件（重置角色状态）
+rm -f scenarios/scenario.txt
+
+# 查看工作流输出（非阻塞测试）
+PYTHONPATH=. timeout 30 uv run python debug_chunk_content.py
+```
 
 ## 项目特性
 
@@ -232,3 +268,22 @@ LangGraph工作流(scenario_workflow) →
 - 情景更新Agent使用文件操作工具管理scenario文件
 - 两个Agent共享sequential_thinking工具进行推理
 - debug模式可输出详细的Agent执行信息
+
+## 重要机制说明
+
+### 端口自动递增机制
+系统启动时会自动检测配置端口是否被占用：
+- 从config.yaml中的端口开始检测
+- 如被占用则自动+1，最多尝试20个端口
+- 最终使用的端口会在终端输出中显示
+- 避免手动解决端口冲突问题
+
+### 角色切换和缓存清理
+- 用户发送"deeproleplay"消息可清除历史缓存
+- 重新开始新的角色扮演会话
+- 避免不同角色间的情景混淆
+
+### 配置文件热重载
+- 支持在运行时修改config.yaml
+- 部分配置项需要重启服务生效
+- 建议使用uvicorn的--reload选项进行开发调试

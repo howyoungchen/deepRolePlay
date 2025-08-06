@@ -68,6 +68,9 @@ class WorkflowStreamConverter:
             SSE formatted string
         """
         try:
+            # Send <think> tag at the beginning
+            yield self.create_sse_data("<think>\n", "workflow_think")
+            
             # Send workflow start event
             yield self.create_sse_data("🔄 Starting to update scenario...\n\n", "workflow_start")
             
@@ -78,11 +81,19 @@ class WorkflowStreamConverter:
             
             # Send workflow completion event
             yield self.create_sse_data("\n✅ Scenario update complete, starting to generate response...\n\n", "workflow_end")
+            
+            # Send </think> tag at the end
+            yield self.create_sse_data("</think>\n", "workflow_think")
+            
             yield self.create_workflow_done_event()
             
         except Exception as e:
             error_msg = f"❌ Error executing workflow: {str(e)}\n\n"
             yield self.create_sse_data(error_msg, "workflow_error")
+            
+            # Send </think> tag even in error cases
+            yield self.create_sse_data("</think>\n", "workflow_think")
+            
             yield self.create_workflow_done_event()
     
     def _process_event(self, event: Dict[str, Any]) -> str:
@@ -92,11 +103,12 @@ class WorkflowStreamConverter:
         data = event.get("data", {})
         
         # Node start
-        if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater"]:
+        if event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater", "llm_forwarding"]:
             self.current_node = name
             node_name_map = {
                 "memory_flashback": "Memory Flashback",
-                "scenario_updater": "Scenario Updater"
+                "scenario_updater": "Scenario Updater",
+                "llm_forwarding": "LLM Forwarding"
             }
             content = f"🔄 Starting node {node_name_map.get(name, name)}...\n"
             return self.create_sse_data(content, "node_start")
@@ -151,20 +163,32 @@ class WorkflowStreamConverter:
             return self.create_sse_data(content, "tool_end")
         
         # Node complete
-        if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater"]:
+        if event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater", "llm_forwarding"]:
             node_output = data.get("output", {})
             
             node_name_map = {
                 "memory_flashback": "Memory Flashback",
-                "scenario_updater": "Scenario Updater"
+                "scenario_updater": "Scenario Updater",
+                "llm_forwarding": "LLM Forwarding"
             }
             
             content = f"✅ Node {node_name_map.get(name, name)} complete\n"
-            for key, value in node_output.items():
-                if isinstance(value, str) and len(value) > 100:
-                    content += f"  {key}: {value[:100]}...\n"
-                else:
-                    content += f"  {key}: {value}\n"
+            
+            # 对于llm_forwarding节点，特殊处理输出格式
+            if name == "llm_forwarding":
+                llm_response = node_output.get("llm_response")
+                if llm_response and hasattr(llm_response, 'content'):
+                    response_preview = llm_response.content[:200] + "..." if len(llm_response.content) > 200 else llm_response.content
+                    content += f"  Response: {response_preview}\n"
+                if hasattr(llm_response, 'reasoning_content') and llm_response.reasoning_content:
+                    content += f"  Has reasoning content: Yes\n"
+            else:
+                for key, value in node_output.items():
+                    if isinstance(value, str) and len(value) > 100:
+                        content += f"  {key}: {value[:100]}...\n"
+                    else:
+                        content += f"  {key}: {value}\n"
+            
             content += "\n" + "-" * 50 + "\n"
             
             self.current_node = None

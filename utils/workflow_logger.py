@@ -63,6 +63,23 @@ class WorkflowLogger:
         }
         
         try:
+            # 检查是否是llm_forwarding节点的自定义格式
+            if "model_config" in response and "input_messages" in response:
+                # 这是llm_forwarding节点的响应，直接返回结构化数据，不要messages_full重复字段
+                parsed = {
+                    "model_config": response.get("model_config", {}),
+                    "input_messages": response.get("input_messages", []),
+                    "output_content": response.get("output_content", ""),
+                    "reasoning_content": response.get("reasoning_content", ""),
+                    "usage_metadata": response.get("usage_metadata", {}),
+                    "execution_status": response.get("execution_status", "unknown"),
+                    "content_length": response.get("content_length", 0),
+                    "has_reasoning": response.get("has_reasoning", False)
+                }
+                
+                return parsed
+            
+            # 原有的messages处理逻辑（用于其他节点）
             messages = response.get("messages", [])
             
             if messages:

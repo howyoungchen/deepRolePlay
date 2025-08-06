@@ -7,7 +7,6 @@ from pathlib import Path
 
 from config.manager import settings
 from src.api.proxy import router as proxy_router
-from utils.logger import request_logger
 
 
 @asynccontextmanager
@@ -16,7 +15,6 @@ async def lifespan(app: FastAPI):
     # Execute on startup
     print("=== DeepRolePlay Proxy Server Starting ===")
     print(f"Target URL: {settings.proxy.target_url}")
-    print(f"Log Directory: {settings.system.log_dir}")
     print(f"Server: {settings.server.host}:{settings.server.port}")
     print("=====================================")
     
@@ -49,8 +47,6 @@ def create_app() -> FastAPI:
     # Register routes
     app.include_router(proxy_router, prefix="", tags=["proxy"])
     
-    # Ensure log directory exists
-    Path(settings.system.log_dir).mkdir(exist_ok=True)
     
     return app
 
@@ -110,7 +106,7 @@ if __name__ == "__main__":
                 host=settings.server.host,
                 port=current_port,
                 reload=settings.server.reload,
-                log_level=settings.system.log_level.lower()
+                log_level="info"
             )
         except KeyboardInterrupt:
             print("\nServer has been interrupted by the user")

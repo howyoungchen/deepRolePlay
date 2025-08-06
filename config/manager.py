@@ -13,6 +13,7 @@ class ProxyConfig(BaseModel):
     models_url: Optional[str] = None  # The URL for the models API. If not set, it's automatically constructed from target_url.
     api_key: Optional[str] = None  # API key is obtained from the frontend request, no longer needs to be configured.
     timeout: int = 30
+    debug_mode: bool = False
     
     def get_models_url(self) -> str:
         """Get the models API URL. If not set, it's automatically constructed from target_url."""
@@ -27,9 +28,6 @@ class ProxyConfig(BaseModel):
             return f"{self.target_url.rstrip('/')}/models"
 
 
-class SystemConfig(BaseModel):
-    log_level: str = "INFO"
-    log_dir: str = "./logs"
 
 
 class ServerConfig(BaseModel):
@@ -42,13 +40,12 @@ class ScenarioConfig(BaseModel):
     file_path: str = "./scenarios/current_scenario.txt"
 
 
-class WorkflowConfig(BaseModel):
-    enabled: bool = True
-
 
 class LangGraphConfig(BaseModel):
     max_history_length: int = 20
     history_ai_message_offset: int = 1  # Start counting history from the Nth-to-last AI message.
+    only_forward: bool = False  # 当为true时跳过记忆闪回和情景更新节点，直接转发到LLM
+    stream_workflow_to_frontend: bool = True  # 控制是否将工作流推理过程推送到前端
 
 
 class AgentConfig(BaseModel):
@@ -78,10 +75,8 @@ class Settings(BaseSettings):
     )
     
     proxy: ProxyConfig = ProxyConfig()
-    system: SystemConfig = SystemConfig()
     server: ServerConfig = ServerConfig()
     scenario: ScenarioConfig = ScenarioConfig()
-    workflow: WorkflowConfig = WorkflowConfig()
     langgraph: LangGraphConfig = LangGraphConfig()
     agent: AgentConfig = AgentConfig()
     
