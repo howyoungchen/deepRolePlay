@@ -1,79 +1,79 @@
 
 # ====================================================================
-# DeepRolePlay 配置文件 - 新手必读
+# DeepRolePlay Configuration File - Beginner's Guide
 # ====================================================================
 # 
-# 🤔 什么是"转发LLM"和"代理LLM"？
+# 🤔 What are "Forwarding LLM" and "Agent LLM"?
 # 
-# 【转发LLM】= 你真正想要对话的AI模型
-# • 这是最终和用户聊天的AI，比如DeepSeek、Claude、GPT等
-# • 你在SillyTavern里填的API Key就是这个模型的密钥
-# • 配置位置：下面的 proxy 部分
+# 【Forwarding LLM】= The AI model you actually want to chat with
+# • This is the AI that ultimately chats with users, like DeepSeek, Claude, GPT, etc.
+# • The API Key you fill in SillyTavern is for this model
+# • Configuration location: proxy section below
 # 
-# 【代理LLM】= 幕后工作的智能助手AI模型  
-# • 负责"记忆闪回"和"情景更新"的AI，用户看不到它的回复
-# • 建议用便宜快速的模型，如Gemini 2.5 Flash（免费额度大）
-# • 配置位置：下面的 agent 部分
+# 【Agent LLM】= Behind-the-scenes intelligent assistant AI model  
+# • Responsible for "memory flashback" and "scenario update", users don't see its replies
+# • Recommended to use cheap and fast models, like Gemini 2.5 Flash (large free quota)
+# • Configuration location: agent section below
 # 
-# 💡 举个例子：
-# - 转发LLM：DeepSeek（便宜，和用户对话）→ base_url填写到 proxy 部分,api_key和其他配置填写到你所使用前端即可。而前端需要填写的base_url是http://localhost:6666/api/v1
-# - 代理LLM：Gemini（免费，后台工作）→ 填写到 agent 部分
-# - 你需要两个不同的API Key！
+# 💡 Example:
+# - Forwarding LLM: DeepSeek (cheap, chats with users) → fill base_url in proxy section, api_key and other configs in your frontend. Frontend should fill base_url as http://localhost:6666/api/v1
+# - Agent LLM: Gemini (free, background work) → fill in agent section
+# - You need two different API Keys!
 # 
-# 🔗 数据流：用户 → DeepRolePlay → 代理LLM处理记忆 → 转发LLM生成回复
+# 🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forwarding LLM generates reply
 # ====================================================================
 
-# 【API代理配置】转发到目标LLM服务
+# 【API Proxy Configuration】Forward to target LLM service
 proxy:
-  # 最终调用的LLM服务地址｜控制请求转发目标｜需要改：填入你要使用的LLM服务API地址
+  # Final LLM service address | Controls request forwarding target | Need to change: Fill in your LLM service API address
   target_url: "https://api.deepseek.com/v1"
-  # HTTP请求超时时间(秒)｜控制请求等待时长｜一般不需要改：30秒足够
+  # HTTP request timeout (seconds) | Controls request wait time | Usually no need to change: 30 seconds is enough
   timeout: 30
-  # 调试模式开关｜控制是否跳过工作流直接返回测试消息｜一般不需要改：false为正常工作
+  # Debug mode switch | Controls whether to skip workflow and return test message directly | Usually no need to change: false for normal operation
   debug_mode: false
 
-# 【情景文件配置】角色状态存储
+# 【Scenario File Configuration】Character state storage
 scenario:
-  # 情景文件存储路径｜控制角色状态保存位置｜一般不需要改：自动创建目录
+  # Scenario file storage path | Controls character state save location | Usually no need to change: auto-create directory
   file_path: "./scenarios/scenario.txt"
 
-# 【工作流控制配置】Agent执行参数
+# 【Workflow Control Configuration】Agent execution parameters
 langgraph:
-  # 传递给Agent的历史消息条数｜控制上下文长度和token消耗｜可调整：3-15条，影响记忆效果和成本
+  # Number of history messages passed to target LLM | Controls context length and token consumption | Adjustable: 3-15 messages, affects memory effectiveness and cost
   max_history_length: 7
-  # 历史消息起始偏移｜控制消息计算起点｜一般不需要改：技术参数
+  # History message start offset | Controls message calculation start point | Usually no need to change: technical parameter
   history_ai_message_offset: 1
-  # 快速转发模式｜控制是否跳过Agent直接转发｜一般不需要改：false为正常工作
+  # Fast forward mode | Controls whether to skip Agent and forward directly | Usually no need to change: false for normal operation
   only_forward: false
-  # 工作流前端推流开关｜控制是否将智能体推理过程推送到前端｜可调整：true显示推理过程，false只显示最终对话
-  stream_workflow_to_frontend: true
+  # Workflow frontend streaming switch | Controls whether to push agent reasoning process to frontend | Adjustable: true shows reasoning process, false shows only final conversation
+  stream_workflow_to_frontend: false
 
-# 【Agent智能体配置】记忆闪回和情景更新的AI模型
+# 【Agent Configuration】AI model for memory flashback and scenario update
 agent:
-  # AI模型名称｜控制使用哪个AI模型｜使用DeepSeek作为代理模型
+  # AI model name | Controls which AI model to use | Using DeepSeek as agent model
   model: "openai/gpt-oss-120b"
-  # 生成随机性(0-1)｜控制回答的创造性｜可调整：0.1稳定，0.7创意，影响一致性
+  # Generation randomness (0-1) | Controls answer creativity | Adjustable: 0.1 stable, 0.7 creative, affects consistency
   temperature: 0.1
-  # API服务提供商地址｜控制模型调用接口｜使用DeepSeek API
+  # API service provider address | Controls model call interface | Using DeepSeek API
   base_url: "https://openrouter.ai/api/v1"
-  # API访问密钥｜控制服务认证｜需要改：填入你的OpenRouter API密钥
-  api_key: "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"
-  # 最大输出token数｜控制单次生成长度上限｜一般不需要改：8192足够大多数场景
+  # API access key | Controls service authentication | Need to change: Fill in your OpenRouter API key
+  api_key: "Your-OpenRouter-API-Key"
+  # Maximum output tokens | Controls single generation length limit | Usually no need to change: 8192 is enough for most scenarios
   max_tokens: 8192
-  # 采样概率阈值(0-1)｜控制词汇选择范围｜一般不需要改：0.9保证多样性
+  # Sampling probability threshold (0-1) | Controls vocabulary selection range | Usually no need to change: 0.9 ensures diversity
   top_p: 0.9
-  # Agent调试信息｜控制是否显示详细执行过程｜调试时改：true显示过程，false正常运行
+  # Agent debug info | Controls whether to show detailed execution process | Change when debugging: true shows process, false normal operation
   debug: false
-  # 最大执行轮次｜控制防止死循环的上限｜一般不需要改：40次足够复杂任务
+  # Maximum execution rounds | Controls upper limit to prevent infinite loops | Usually no need to change: 40 rounds enough for complex tasks
   max_iterations: 40
-  # 单次请求超时(秒)｜控制Agent调用等待时长｜可调整：网络慢可增加到180
+  # Single request timeout (seconds) | Controls Agent call wait time | Adjustable: can increase to 180 for slow networks
   timeout: 120
 
-# 【服务器配置】DeepRolePlay服务网络设置
+# 【Server Configuration】DeepRolePlay service network settings
 server:
-  # 监听IP地址｜控制外部访问权限｜一般不需要改：0.0.0.0允许局域网访问
+  # Listen IP address | Controls external access permissions | Usually no need to change: 0.0.0.0 allows LAN access
   host: "0.0.0.0"
-  # 服务端口号｜控制前端连接端口｜可调整：如被占用会自动+1，前端需对应修改
+  # Service port number | Controls frontend connection port | Adjustable: if occupied will auto +1, frontend needs corresponding modification
   port: 6666
-  # 代码热重载｜控制开发时自动重启｜一般不需要改：false避免生产环境意外重启
+  # Code hot reload | Controls auto-restart during development | Usually no need to change: false avoids accidental restart in production
   reload: false

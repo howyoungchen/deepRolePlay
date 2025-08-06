@@ -23,7 +23,7 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 - 💰 **成本可控**：情景压缩技术，长对话费用降低 80%
 - 📚 **智能联网**：集成 Wikipedia 百科，免费自动补全角色背景和故事设定
 - ⚡ **即插即用**：5分钟集成，SillyTavern 等平台直接使用
-- 🚀 **超高速响应**：采用 Gemini 2.5 Flash 智能代理，仅比正常回复多 20-30 秒
+- 🚀 **超高速响应**：采用开源 openai/gpt-oss-120b 智能代理，仅比正常回复多 20 秒
 
 ## 🎯 如何使用
 
@@ -35,7 +35,7 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
 
 2. **⚙️ 修改配置文件**
    
-   编辑 `config.yaml` 文件，**强烈推荐智能代理使用 Gemini 2.5 Flash（响应仅比正常多20秒）**：
+   编辑 `config.yaml` 文件，**强烈推荐智能代理使用 Gemini 2.5 Flash 或 GPT OSS 120B（响应仅比正常多20秒）**：
 
    ```yaml
    # API代理配置 - 转发目标
@@ -43,11 +43,16 @@ DeepRolePlay 采用多智能体分工架构：**记忆闪回智能体** + **情�
      target_url: "https://api.deepseek.com/v1"                      # 你要转发的API地址，推荐deepseek
      timeout: 60                                                     # 建议设置60秒
    
-   # 智能体配置 - Agent 使用的模型（必须是Gemini 2.5 Flash）
+   # 工作流控制配置
+   langgraph:
+     max_history_length: 7                                           # 传递给转发目标LLM的历史消息数量，控制context长度和token消耗
+     stream_workflow_to_frontend: false                              # DRP工作流推送开关，默认不推送DRP内容到前端，如需推送请设置为true并在SillyTavern导入deeproleplay.json正则
+   
+   # 智能体配置 - Agent 使用的模型（推荐Gemini 2.5 Flash或GPT OSS 120B）
    agent:
-     model: "gemini-2.5-flash"                                       # 强烈推荐 使用 Gemini 2.5 Flash
-     base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API地址
-     api_key: "your-gemini-api-key"                                  # 填入你的 Gemini API Key
+     model: "openai/gpt-oss-120b"                                       # 推荐: gemini-2.5-flash 或 openai/gpt-oss-120b
+     base_url: "https://openrouter.ai/api/v1"                        # OpenRouter API地址
+     api_key: "your-openrouter-api-key"                              # 填入你的 OpenRouter API Key
      temperature: 0.7
      max_iterations: 25
    
@@ -130,7 +135,7 @@ uv pip install -r requirements.txt
 
 ### 2. 配置服务
 
-编辑 `config/config.yaml` 文件，**推荐使用 Gemini 2.5 Flash（响应快）**：
+编辑 `config/config.yaml` 文件，**推荐使用 Gemini 2.5 Flash 或 GPT OSS 120B（响应快）**：
 
 ```yaml
 # API代理配置 - 转发目标
@@ -145,13 +150,14 @@ scenario:
 
 # 工作流控制配置
 langgraph:
-  max_history_length: 7                            # 传递给Agent的历史消息数量
+  max_history_length: 7                            # 传递给转发目标LLM的历史消息数量，控制context长度和token消耗
   history_ai_message_offset: 1                     # 历史消息计算起点
   only_forward: false                               # 快速模式开关
+  stream_workflow_to_frontend: false               # DRP工作流推送开关，默认不推送DRP内容到前端，如需推送请设置为true并在SillyTavern导入deeproleplay.json正则
 
-# 智能体配置 - Agent 使用的模型（推荐Gemini 2.5 Flash）
+# 智能体配置 - Agent 使用的模型（推荐Gemini 2.5 Flash或GPT OSS 120B）
 agent:
-  model: "google/gemini-2.5-flash"                 # 推荐使用 Gemini 2.5 Flash
+  model: "openai/gpt-oss-120b"                 # 推荐使用 Gemini 2.5 Flash 或 openai/gpt-oss-120b
   base_url: "https://openrouter.ai/api/v1"         # API服务地址（推荐OpenRouter）
   api_key: "your-api-key"                          # 填入你的 API Key
   temperature: 0.1                                 # 生成温度（0-1）
@@ -206,9 +212,15 @@ pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src"
 ### 🔌 全面兼容 OpenAI 格式 API
 本项目采用标准 OpenAI API 格式，支持所有兼容的服务商：
 
-- **🌟 Gemini 2.5 Flash**（强烈推荐）：速度最快，仅增加20秒响应时间，角色扮演效果出色
-- **💰 DeepSeek**：性价比最高，成本低廉
+#### 智能体推荐模型
+- **🌟 Gemini 2.5 Flash**（强烈推荐）：仅增加20秒响应时间，角色扮演效果出色
+- **🎯 GPT OSS 120B** (强烈推荐)：开源模型，智能体任务表现优秀，成本最低速度最快！
+- **💰 DeepSeek**：速度较慢
+
+#### 转发目标模型
 - **💻 本地 Ollama**：完全私有化部署，数据安全
+- **🔥 DeepSeek**：高质量对话，成本低廉
+- **⚡ Claude**：逻辑清晰，推理能力强
 
 ### ⚠️ 不推荐 OpenAI 官方 API
 虽然完全兼容 OpenAI 格式，但**不建议使用 OpenAI 官方服务**：

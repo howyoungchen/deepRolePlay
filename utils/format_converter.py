@@ -1,5 +1,5 @@
 """
-格式转换工具：将LangGraph消息转换为OpenAI格式
+Format conversion tool: Convert LangGraph messages to OpenAI format
 """
 import json
 import time
@@ -10,24 +10,24 @@ from langchain_core.messages import BaseMessage, AIMessage
 
 def convert_to_openai_format(msg: BaseMessage, metadata: Optional[Dict] = None, model: str = "deepseek-chat") -> Dict[str, Any]:
     """
-    将LangGraph消息转换为OpenAI SSE格式
+    Convert LangGraph messages to OpenAI SSE format
     
     Args:
-        msg: LangChain消息对象
-        metadata: 可选的元数据
-        model: 模型名称
+        msg: LangChain message object
+        metadata: Optional metadata
+        model: Model name
     
     Returns:
-        OpenAI格式的字典
+        Dictionary in OpenAI format
     """
-    # 提取内容
+    # Extract content
     content = ""
     if hasattr(msg, 'content'):
         content = msg.content
     elif isinstance(msg, dict):
         content = msg.get('content', '')
     
-    # 构建OpenAI格式响应
+    # Build OpenAI format response
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
         "object": "chat.completion.chunk",
@@ -47,15 +47,15 @@ def convert_to_openai_format(msg: BaseMessage, metadata: Optional[Dict] = None, 
 
 def convert_to_openai_sse(msg: BaseMessage, metadata: Optional[Dict] = None, model: str = "deepseek-chat") -> str:
     """
-    将LangGraph消息转换为OpenAI SSE格式的字符串
+    Convert LangGraph messages to OpenAI SSE format string
     
     Args:
-        msg: LangChain消息对象
-        metadata: 可选的元数据
-        model: 模型名称
+        msg: LangChain message object
+        metadata: Optional metadata
+        model: Model name
     
     Returns:
-        SSE格式的字符串
+        SSE format string
     """
     openai_chunk = convert_to_openai_format(msg, metadata, model)
     return f"data: {json.dumps(openai_chunk, ensure_ascii=False)}\n\n"
@@ -63,25 +63,25 @@ def convert_to_openai_sse(msg: BaseMessage, metadata: Optional[Dict] = None, mod
 
 def create_done_message() -> str:
     """
-    创建SSE流结束消息
+    Create SSE stream end message
     
     Returns:
-        SSE格式的DONE消息
+        SSE format DONE message
     """
     return "data: [DONE]\n\n"
 
 
 def convert_final_response(response: BaseMessage, model: str = "deepseek-chat", stream: bool = False) -> Dict[str, Any]:
     """
-    将最终的LLM响应转换为OpenAI格式
+    Convert final LLM response to OpenAI format
     
     Args:
-        response: LLM响应
-        model: 模型名称
-        stream: 是否为流式响应
+        response: LLM response
+        model: Model name
+        stream: Whether it's a streaming response
     
     Returns:
-        OpenAI格式的完整响应
+        Complete response in OpenAI format
     """
     content = ""
     if hasattr(response, 'content'):
@@ -92,7 +92,7 @@ def convert_final_response(response: BaseMessage, model: str = "deepseek-chat", 
         content = response
     
     if stream:
-        # 流式响应格式
+        # Streaming response format
         return {
             "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
             "object": "chat.completion.chunk",
@@ -105,7 +105,7 @@ def convert_final_response(response: BaseMessage, model: str = "deepseek-chat", 
             }]
         }
     else:
-        # 非流式响应格式
+        # Non-streaming response format
         return {
             "id": f"chatcmpl-{uuid.uuid4().hex[:8]}",
             "object": "chat.completion",
@@ -120,8 +120,8 @@ def convert_final_response(response: BaseMessage, model: str = "deepseek-chat", 
                 "finish_reason": "stop"
             }],
             "usage": {
-                "prompt_tokens": 0,  # 可以在实际使用时计算
-                "completion_tokens": 0,  # 可以在实际使用时计算
+                "prompt_tokens": 0,  # Can be calculated in actual use
+                "completion_tokens": 0,  # Can be calculated in actual use
                 "total_tokens": 0
             }
         }
@@ -129,15 +129,15 @@ def convert_final_response(response: BaseMessage, model: str = "deepseek-chat", 
 
 def extract_content_from_event(event: Dict[str, Any]) -> Optional[str]:
     """
-    从工作流事件中提取内容
+    Extract content from workflow events
     
     Args:
-        event: 工作流事件
+        event: Workflow event
     
     Returns:
-        提取的内容，如果没有则返回None
+        Extracted content, None if not found
     """
-    # 尝试从不同的事件类型中提取内容
+    # Try to extract content from different event types
     if 'messages' in event:
         messages = event['messages']
         if messages and len(messages) > 0:
@@ -164,27 +164,27 @@ def extract_content_from_event(event: Dict[str, Any]) -> Optional[str]:
     return None
 def convert_chunk_to_sse(chunk: Any, model: str, request_id: str) -> Optional[str]:
     """
-    将从LLM直接获取的流式chunk转换为OpenAI SSE格式
+    Convert streaming chunk from LLM directly to OpenAI SSE format
     
     Args:
-        chunk: LLM的流式响应块
-        model: 模型名称
-        request_id: 请求ID
+        chunk: LLM streaming response chunk
+        model: Model name
+        request_id: Request ID
         
     Returns:
-        SSE格式的字符串，如果chunk无效则返回None
+        SSE format string, None if chunk is invalid
     """
     if not hasattr(chunk, 'choices') or not chunk.choices:
         return None
         
     delta = chunk.choices[0].delta
     
-    # 提取内容
+    # Extract content
     content = ""
     if hasattr(delta, 'content') and delta.content:
         content = delta.content
     
-    # 提取推理内容
+    # Extract reasoning content
     if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
         content = delta.reasoning_content
 
@@ -209,7 +209,7 @@ def convert_chunk_to_sse(chunk: Any, model: str, request_id: str) -> Optional[st
     return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
 def convert_chunk_to_sse_manual(content: str, model: str, request_id: str) -> str:
     """
-    手动创建包含指定内容的SSE块
+    Manually create SSE chunk with specified content
     """
     sse_data = {
         "id": f"chatcmpl-{request_id}",
@@ -230,25 +230,25 @@ def convert_chunk_to_sse_manual(content: str, model: str, request_id: str) -> st
 
 def convert_langgraph_chunk_to_sse(chunk: Any, model: str, request_id: str) -> Optional[str]:
     """
-    将LangGraph的AIMessageChunk转换为OpenAI SSE格式
+    Convert LangGraph AIMessageChunk to OpenAI SSE format
     
     Args:
-        chunk: LangGraph的AIMessageChunk对象
-        model: 模型名称
-        request_id: 请求ID
+        chunk: LangGraph AIMessageChunk object
+        model: Model name
+        request_id: Request ID
         
     Returns:
-        SSE格式的字符串，如果chunk无效或内容为空则返回None
+        SSE format string, None if chunk is invalid or content is empty
     """
-    # 检查是否为AIMessageChunk并提取内容
+    # Check if it's AIMessageChunk and extract content
     content = ""
     if hasattr(chunk, 'content'):
         content = chunk.content or ""
     elif isinstance(chunk, dict) and 'content' in chunk:
         content = chunk['content'] or ""
     
-    # 只有当content有实际内容时才发送SSE
-    # 跳过空内容的chunk以减少无用的网络传输
+    # Only send SSE when content has actual content
+    # Skip empty content chunks to reduce unnecessary network transmission
     if not content or content.strip() == "":
         return None
 
@@ -272,22 +272,22 @@ def convert_langgraph_chunk_to_sse(chunk: Any, model: str, request_id: str) -> O
 
 def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id: str) -> Optional[str]:
     """
-    将工作流事件转换为SSE格式，支持多种事件类型
-    基于pretty_print.py的逻辑，将工具调用、工具输出、LLM输出等都转为SSE格式
+    Convert workflow events to SSE format, supporting multiple event types
+    Based on pretty_print.py logic, converts tool calls, tool outputs, LLM outputs, etc. to SSE format
     
     Args:
-        event: 工作流事件
-        model: 模型名称
-        request_id: 请求ID
+        event: Workflow event
+        model: Model name
+        request_id: Request ID
         
     Returns:
-        SSE格式的字符串，如果事件不需要输出则返回None
+        SSE format string, None if event doesn't need output
     """
     event_type = event.get("event", "unknown")
     name = event.get("name", "")
     data = event.get("data", {})
     
-    # 1. 处理LLM流式输出
+    # 1. Handle LLM streaming output
     if event_type == "on_chat_model_stream" and name == "ChatOpenAI":
         chunk = data.get("chunk", {})
         if hasattr(chunk, 'content') and chunk.content and chunk.content.strip():
@@ -307,9 +307,9 @@ def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id:
             }
             return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
     
-    # 2. 处理节点开始
+    # 2. Handle node start
     elif event_type == "on_chain_start" and name in ["memory_flashback", "scenario_updater"]:
-        content = f"\n{'='*50}\n🔄 开始执行 {name} 节点\n{'='*50}\n"
+        content = f"\n{'='*50}\n🔄 Starting {name} node\n{'='*50}\n"
         sse_data = {
             "id": f"chatcmpl-{request_id}",
             "object": "chat.completion.chunk", 
@@ -326,16 +326,16 @@ def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id:
         }
         return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
     
-    # 3. 处理工具调用开始
+    # 3. Handle tool call start
     elif event_type == "on_tool_start":
         tool_name = name
         tool_input = data.get("input", {})
         
-        content = f"🔧 调用工具: {tool_name}\n"
+        content = f"🔧 Calling tool: {tool_name}\n"
         if tool_input:
-            content += "参数:\n"
+            content += "Parameters:\n"
             for key, value in tool_input.items():
-                # 限制参数值的长度以避免过长的输出
+                # Limit parameter value length to avoid overly long output
                 value_str = str(value)
                 if len(value_str) > 100:
                     value_str = value_str[:100] + "..."
@@ -357,15 +357,15 @@ def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id:
         }
         return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
     
-    # 4. 处理工具调用结果
+    # 4. Handle tool call results
     elif event_type == "on_tool_end":
         tool_name = name
         tool_output = data.get("output", "")
         
-        # 添加分割线，然后显示工具结果
+        # Add separator line, then show tool results
         content = f"{'-'*30}\n"
         
-        # 特殊处理sequential_thinking工具
+        # Special handling for sequential_thinking tool
         if tool_name == "sequential_thinking":
             try:
                 if hasattr(tool_output, 'content'):
@@ -379,15 +379,15 @@ def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id:
                 thought_num = result.get("thought_number", "?")
                 total_thoughts = result.get("total_thoughts", "?")
                 
-                content += f"💭 思考步骤 {thought_num}/{total_thoughts} 完成\n"
+                content += f"💭 Thinking step {thought_num}/{total_thoughts} completed\n"
             except:
-                content += f"💭 {tool_name} 工具执行完成\n"
+                content += f"💭 {tool_name} tool execution completed\n"
         else:
-            # 其他工具显示输出结果
+            # Other tools show output results
             output_str = str(tool_output)
             if len(output_str) > 200:
                 output_str = output_str[:200] + "..."
-            content += f"✅ {tool_name} 结果:\n{output_str}\n"
+            content += f"✅ {tool_name} result:\n{output_str}\n"
         
         content += "\n"
         
@@ -407,9 +407,9 @@ def convert_workflow_event_to_sse(event: Dict[str, Any], model: str, request_id:
         }
         return f"data: {json.dumps(sse_data, ensure_ascii=False)}\n\n"
     
-    # 5. 处理节点完成
+    # 5. Handle node completion
     elif event_type == "on_chain_end" and name in ["memory_flashback", "scenario_updater"]:
-        content = f"\n✅ {name} 节点执行完成\n{'='*50}\n\n"
+        content = f"\n✅ {name} node execution completed\n{'='*50}\n\n"
         sse_data = {
             "id": f"chatcmpl-{request_id}",
             "object": "chat.completion.chunk",
