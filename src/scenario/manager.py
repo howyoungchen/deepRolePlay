@@ -27,29 +27,28 @@ class ScenarioManager:
     
     async def update_scenario(self, workflow_input: Dict[str, Any]):
         """
-        同步更新场景，等待完成，并返回 LLM 响应。
+        同步更新场景，等待完成。
         
         参数:
             workflow_input: 完整的工​​作流输入，包括消息、api_key、模型等。
             
         返回:
-            LLM 响应对象。
+            None (场景已更新到文件)
         """
         try:
             # 动态导入新的工作流以避免循环依赖。
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
-            # 创建并流式传输工作流。
+            # 创建并执行工作流
             workflow = create_scenario_workflow()
-            final_result = None
             
-            # 使用 astream_events 获取流式事件并等待最终结果
+            # 使用 astream_events 获取流式事件并等待完成
             async for event in workflow.astream_events(workflow_input, version="v2"):
                 if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
-                    final_result = event.get("data", {}).get("output", {})
+                    # 工作流完成，场景已更新
                     break
             
-            return final_result.get("llm_response") if final_result else None
+            return None
     
         except Exception as e:
             raise RuntimeError(f"更新场景失败: {str(e)}")

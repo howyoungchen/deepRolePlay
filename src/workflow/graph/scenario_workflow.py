@@ -539,6 +539,134 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         }
 
 
+async def _prepare_llm_call(original_messages: List[Dict], api_key: str, model: str):
+    """
+    准备LLM调用的共享逻辑
+    
+    Returns:
+        tuple: (client, injected_messages, final_model, final_temperature)
+    """
+    from openai import AsyncOpenAI
+    
+    # 使用代理配置或默认配置
+    proxy_config = settings.proxy
+    agent_config = settings.agent
+    base_url = proxy_config.target_url
+    # 注意：这里应该使用传入的api_key，而不是代理的api_key
+    # 如果没有提供api_key，应该让请求失败，而不是使用代理的密钥
+    final_api_key = api_key if api_key else ""
+    final_model = model if model else "deepseek-chat"
+    final_temperature = agent_config.temperature
+    
+    # 1. 读取最新情景内容
+    from utils.scenario_utils import read_scenario
+    current_scenario = await read_scenario()
+    
+    # 2. 情景注入
+    from utils.messages_process import inject_scenario
+    injected_messages = inject_scenario(original_messages, current_scenario)
+    
+    # 3. 创建OpenAI客户端
+    client = AsyncOpenAI(
+        api_key=final_api_key,
+        base_url=base_url
+    )
+    
+    return client, injected_messages, final_model, final_temperature
+
+
+async def forward_to_llm_non_streaming(original_messages: List[Dict], api_key: str, model: str):
+    """
+    独立的LLM转发函数（非流式版本）
+    在情景更新完成后调用，进行非流式LLM调用
+    
+    Args:
+        original_messages: 原始消息列表
+        api_key: API密钥
+        model: 模型名称
+    
+    Returns:
+        完整的LLM响应对象
+    """
+    import time
+    start_time = time.time()
+    
+    try:
+        # 准备LLM调用
+        client, injected_messages, final_model, final_temperature = await _prepare_llm_call(
+            original_messages, api_key, model
+        )
+        
+        # 调用LLM非流式接口
+        response = await client.chat.completions.create(
+            model=final_model,
+            messages=injected_messages,
+            stream=False,
+            temperature=final_temperature
+        )
+        
+        # 构建完整响应内容
+        reasoning_content = getattr(response.choices[0].message, 'reasoning_content', '') or ""
+        main_content = response.choices[0].message.content or ""
+        
+        # 组合推理内容和正文内容
+        if reasoning_content:
+            full_content = f"<think>\n{reasoning_content}\n</think>\n{main_content}"
+        else:
+            full_content = main_content
+        
+        # 创建兼容的响应对象
+        class NonStreamResponse:
+            def __init__(self, content, response_obj):
+                self.content = content
+                self.reasoning_content = reasoning_content
+                self.response_metadata = {"model": final_model}
+                self.usage_metadata = {
+                    "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
+                    "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "total_tokens": response.usage.total_tokens if response.usage else 0
+                }
+                self.raw_response = response_obj
+        
+        duration = time.time() - start_time
+        
+        # 日志记录
+        await workflow_logger.log_agent_execution(
+            node_type="llm_forwarding_non_streaming",
+            inputs={
+                "model": final_model,
+                "messages_count": len(original_messages),
+                "temperature": final_temperature
+            },
+            agent_response={
+                "output_content": full_content,
+                "has_reasoning": bool(reasoning_content),
+                "usage_metadata": response.usage.model_dump() if response.usage else {}
+            },
+            outputs={
+                "content_length": len(full_content),
+                "duration": duration
+            },
+            duration=duration
+        )
+        
+        return NonStreamResponse(full_content, response)
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        
+        await workflow_logger.log_execution_error(
+            node_type="llm_forwarding_non_streaming",
+            inputs={"model": model, "messages_count": len(original_messages)},
+            error_message=str(e),
+            error_details=error_details
+        )
+        
+        print(f"非流式LLM转发执行失败: {str(e)}")
+        raise
+
+
 async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, model: str):
     """
     独立的LLM转发函数，从工作流中拆分出来
@@ -553,40 +681,15 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
         流式LLM响应块
     """
     import time
-    from openai import AsyncOpenAI
     start_time = time.time()
     
-    # 使用代理配置或默认配置
-    proxy_config = settings.proxy
-    agent_config = settings.agent
-    base_url = proxy_config.target_url
-    final_api_key = api_key if api_key else agent_config.api_key
-    final_model = model if model else "deepseek-chat"
-    final_temperature = agent_config.temperature
-    
-    inputs = {
-        "model": final_model,
-        "base_url": base_url,
-        "temperature": final_temperature,
-        "messages_count": len(original_messages)
-    }
-    
     try:
-        # 1. 读取最新情景内容
-        from utils.scenario_utils import read_scenario
-        current_scenario = await read_scenario()
-        
-        # 2. 情景注入
-        from utils.messages_process import inject_scenario
-        injected_messages = inject_scenario(original_messages, current_scenario)
-        
-        # 3. 创建OpenAI客户端
-        client = AsyncOpenAI(
-            api_key=final_api_key,
-            base_url=base_url
+        # 准备LLM调用
+        client, injected_messages, final_model, final_temperature = await _prepare_llm_call(
+            original_messages, api_key, model
         )
         
-        # 4. 调用LLM流式接口
+        # 调用LLM流式接口
         response_stream = await client.chat.completions.create(
             model=final_model,
             messages=injected_messages,
@@ -640,47 +743,37 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
                 # 传递其他chunk（如finish_reason等）
                 yield chunk
         
+        # 简化的日志记录（流式完成后）
         duration = time.time() - start_time
-        
-        outputs = {
-            "injected_messages": injected_messages,
-            "injected_messages_count": len(injected_messages),
-            "current_scenario": current_scenario,
-            "duration": duration,
-            "model_used": final_model
-        }
-        
-        # 记录日志（简化版）
-        agent_response = {
-            "messages": [],
-            "model_config": {"model": final_model, "base_url": base_url, "stream": True},
-            "input_messages": injected_messages,
-            "output_content": "[Streaming Response]",
-            "execution_status": "streaming_completed"
-        }
-        
         await workflow_logger.log_agent_execution(
-            node_type="llm_forwarding_standalone",
-            inputs=inputs,
-            agent_response=agent_response,
-            outputs=outputs,
+            node_type="llm_forwarding_streaming",
+            inputs={
+                "model": final_model,
+                "messages_count": len(original_messages),
+                "temperature": final_temperature
+            },
+            agent_response={
+                "output_content": "[Streaming Response Completed]",
+                "execution_status": "streaming_completed"
+            },
+            outputs={
+                "duration": duration
+            },
             duration=duration
         )
         
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        duration = time.time() - start_time
         
-        # 记录错误
         await workflow_logger.log_execution_error(
-            node_type="llm_forwarding_standalone",
-            inputs=inputs,
+            node_type="llm_forwarding_streaming",
+            inputs={"model": model, "messages_count": len(original_messages)},
             error_message=str(e),
             error_details=error_details
         )
         
-        print(f"独立LLM转发执行失败: {str(e)}")
+        print(f"流式LLM转发执行失败: {str(e)}")
         
         # 创建错误响应chunk
         class ErrorChunk:

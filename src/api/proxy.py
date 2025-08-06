@@ -79,12 +79,19 @@ class ProxyService:
             )
             workflow_input["stream"] = False
             
-            llm_response = await scenario_manager.update_scenario(workflow_input)
+            # 1. 先更新场景
+            await scenario_manager.update_scenario(workflow_input)
             
-            # 确保llm_response不是协程对象
-            if hasattr(llm_response, '__await__'):
-                llm_response = await llm_response
+            # 2. 调用独立的非流式LLM转发函数
+            from src.workflow.graph.scenario_workflow import forward_to_llm_non_streaming
             
+            llm_response = await forward_to_llm_non_streaming(
+                original_messages=workflow_input["original_messages"],
+                api_key=workflow_input["api_key"],
+                model=chat_request.model
+            )
+            
+            # 3. 转换为OpenAI格式响应
             response_data = convert_final_response(llm_response, chat_request.model, stream=False)
             
             duration = time.time() - start_time
