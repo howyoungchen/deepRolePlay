@@ -42,11 +42,10 @@ class ScenarioManager:
             # 创建并执行工作流
             workflow = create_scenario_workflow()
             
-            # 使用 astream_events 获取流式事件并等待完成
+            # 使用 astream_events 获取流式事件，处理所有事件以确保日志记录执行
             async for event in workflow.astream_events(workflow_input, version="v2"):
-                if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
-                    # 工作流完成，场景已更新
-                    break
+                # 处理所有事件，不再提前退出，确保日志记录等副作用执行
+                pass
             
             return None
     
