@@ -597,6 +597,10 @@ async def forward_to_llm_non_streaming(original_messages: List[Dict], api_key: s
             original_messages, api_key, model
         )
         
+        # 获取配置用于日志记录
+        proxy_config = settings.proxy
+        base_url = proxy_config.target_url
+        
         # 调用LLM非流式接口
         response = await client.chat.completions.create(
             model=final_model,
@@ -639,9 +643,18 @@ async def forward_to_llm_non_streaming(original_messages: List[Dict], api_key: s
                 "temperature": final_temperature
             },
             agent_response={
+                "model_config": {
+                    "model": final_model,
+                    "base_url": base_url,
+                    "temperature": final_temperature,
+                    "stream": False
+                },
+                "input_messages": injected_messages,
                 "output_content": full_content,
+                "reasoning_content": reasoning_content,
                 "has_reasoning": bool(reasoning_content),
-                "usage_metadata": response.usage.model_dump() if response.usage else {}
+                "usage_metadata": response.usage.model_dump() if response.usage else {},
+                "execution_status": "completed"
             },
             outputs={
                 "content_length": len(full_content),
@@ -689,6 +702,10 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
             original_messages, api_key, model
         )
         
+        # 获取配置用于日志记录
+        proxy_config = settings.proxy
+        base_url = proxy_config.target_url
+        
         # 调用LLM流式接口
         response_stream = await client.chat.completions.create(
             model=final_model,
@@ -697,9 +714,11 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
             temperature=final_temperature
         )
         
-        # 5. 创建处理<think>标签的包装生成器
+        # 5. 创建处理<think>标签的包装生成器和内容收集器
         reasoning_started = False
         content_started = False
+        collected_reasoning = ""
+        collected_content = ""
         
         async for chunk in response_stream:
             if not chunk.choices:
@@ -710,6 +729,9 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
             
             # 处理推理过程
             if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                # 收集推理内容
+                collected_reasoning += delta.reasoning_content
+                
                 if not reasoning_started:
                     # 创建一个包含<think>标签的新chunk
                     from copy import deepcopy
@@ -729,6 +751,9 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
             
             # 处理正文回答
             elif hasattr(delta, "content") and delta.content:
+                # 收集正文内容
+                collected_content += delta.content
+                
                 if reasoning_started and not content_started:
                     # 创建包含</think>结束标签的chunk
                     from copy import deepcopy
@@ -743,8 +768,15 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
                 # 传递其他chunk（如finish_reason等）
                 yield chunk
         
-        # 简化的日志记录（流式完成后）
+        # 完整的日志记录（流式完成后）
         duration = time.time() - start_time
+        
+        # 组合完整的输出内容
+        if collected_reasoning:
+            full_content = f"<think>\n{collected_reasoning}\n</think>\n{collected_content}"
+        else:
+            full_content = collected_content
+        
         await workflow_logger.log_agent_execution(
             node_type="llm_forwarding_streaming",
             inputs={
@@ -753,10 +785,20 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
                 "temperature": final_temperature
             },
             agent_response={
-                "output_content": "[Streaming Response Completed]",
+                "model_config": {
+                    "model": final_model,
+                    "base_url": base_url,
+                    "temperature": final_temperature,
+                    "stream": True
+                },
+                "input_messages": injected_messages,
+                "output_content": full_content,
+                "reasoning_content": collected_reasoning,
+                "has_reasoning": bool(collected_reasoning),
                 "execution_status": "streaming_completed"
             },
             outputs={
+                "content_length": len(full_content),
                 "duration": duration
             },
             duration=duration
