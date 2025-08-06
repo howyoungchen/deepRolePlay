@@ -39,10 +39,17 @@ class ScenarioManager:
             # Dynamically import the new workflow to avoid circular dependencies.
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
-            # Create and invoke the workflow.
+            # Create and stream the workflow.
             workflow = create_scenario_workflow()
-            result = await workflow.ainvoke(workflow_input)
-            return result.get("llm_response")
+            final_result = None
+            
+            # Use astream_events to get streaming events and wait for final result
+            async for event in workflow.astream_events(workflow_input, version="v2"):
+                if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
+                    final_result = event.get("data", {}).get("output", {})
+                    break
+            
+            return final_result.get("llm_response") if final_result else None
     
         except Exception as e:
             raise RuntimeError(f"Failed to update scenario: {str(e)}")

@@ -171,9 +171,10 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
         )
         
         # ================ Invoke Agent for Memory Flashback ================
+        recursion_limit = 2 * agent_config.max_iterations + 1
         response = await agent.ainvoke(
             {"messages": [{"role": "user", "content": user_prompt}]},
-            config={"configurable": {"conversation_history": messages}}
+            config={"configurable": {"conversation_history": messages}, "recursion_limit": recursion_limit}
         )
         
         # ================ Extract and Process Result ================
@@ -267,9 +268,11 @@ async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
         )
         
         # ================ Invoke Agent for Scenario Update ================
-        response = await agent.ainvoke({
-            "messages": [{"role": "user", "content": user_prompt}]
-        })
+        recursion_limit = 2 * agent_config.max_iterations + 1
+        response = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": user_prompt}]},
+            config={"recursion_limit": recursion_limit}
+        )
         
         # ================ Read and Process Result ================
         from utils.scenario_utils import read_scenario
@@ -536,20 +539,174 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
         }
 
 
+async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, model: str):
+    """
+    独立的LLM转发函数，从工作流中拆分出来
+    在情景更新完成后调用，直接进行流式LLM调用
+    
+    Args:
+        original_messages: 原始消息列表
+        api_key: API密钥
+        model: 模型名称
+    
+    Yields:
+        流式LLM响应块
+    """
+    import time
+    from openai import AsyncOpenAI
+    start_time = time.time()
+    
+    # 使用代理配置或默认配置
+    proxy_config = settings.proxy
+    agent_config = settings.agent
+    base_url = proxy_config.target_url
+    final_api_key = api_key if api_key else agent_config.api_key
+    final_model = model if model else "deepseek-chat"
+    final_temperature = agent_config.temperature
+    
+    inputs = {
+        "model": final_model,
+        "base_url": base_url,
+        "temperature": final_temperature,
+        "messages_count": len(original_messages)
+    }
+    
+    try:
+        # 1. 读取最新情景内容
+        from utils.scenario_utils import read_scenario
+        current_scenario = await read_scenario()
+        
+        # 2. 情景注入
+        from utils.messages_process import inject_scenario
+        injected_messages = inject_scenario(original_messages, current_scenario)
+        
+        # 3. 创建OpenAI客户端
+        client = AsyncOpenAI(
+            api_key=final_api_key,
+            base_url=base_url
+        )
+        
+        # 4. 调用LLM流式接口
+        response_stream = await client.chat.completions.create(
+            model=final_model,
+            messages=injected_messages,
+            stream=True,
+            temperature=final_temperature
+        )
+        
+        # 5. 创建处理<think>标签的包装生成器
+        reasoning_started = False
+        content_started = False
+        
+        async for chunk in response_stream:
+            if not chunk.choices:
+                yield chunk
+                continue
+                
+            delta = chunk.choices[0].delta
+            
+            # 处理推理过程
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
+                if not reasoning_started:
+                    # 创建一个包含<think>标签的新chunk
+                    from copy import deepcopy
+                    think_start_chunk = deepcopy(chunk)
+                    think_start_chunk.choices[0].delta.content = "<think>"
+                    if hasattr(think_start_chunk.choices[0].delta, 'reasoning_content'):
+                        think_start_chunk.choices[0].delta.reasoning_content = None
+                    yield think_start_chunk
+                    reasoning_started = True
+                
+                # 创建包含推理内容的chunk (将reasoning_content转为content)
+                from copy import deepcopy
+                reasoning_chunk = deepcopy(chunk)
+                reasoning_chunk.choices[0].delta.content = delta.reasoning_content
+                reasoning_chunk.choices[0].delta.reasoning_content = None
+                yield reasoning_chunk
+            
+            # 处理正文回答
+            elif hasattr(delta, "content") and delta.content:
+                if reasoning_started and not content_started:
+                    # 创建包含</think>结束标签的chunk
+                    from copy import deepcopy
+                    think_end_chunk = deepcopy(chunk)
+                    think_end_chunk.choices[0].delta.content = "</think>\n"
+                    yield think_end_chunk
+                    content_started = True
+                
+                # 直接传递原始chunk
+                yield chunk
+            else:
+                # 传递其他chunk（如finish_reason等）
+                yield chunk
+        
+        duration = time.time() - start_time
+        
+        outputs = {
+            "injected_messages": injected_messages,
+            "injected_messages_count": len(injected_messages),
+            "current_scenario": current_scenario,
+            "duration": duration,
+            "model_used": final_model
+        }
+        
+        # 记录日志（简化版）
+        agent_response = {
+            "messages": [],
+            "model_config": {"model": final_model, "base_url": base_url, "stream": True},
+            "input_messages": injected_messages,
+            "output_content": "[Streaming Response]",
+            "execution_status": "streaming_completed"
+        }
+        
+        await workflow_logger.log_agent_execution(
+            node_type="llm_forwarding_standalone",
+            inputs=inputs,
+            agent_response=agent_response,
+            outputs=outputs,
+            duration=duration
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        duration = time.time() - start_time
+        
+        # 记录错误
+        await workflow_logger.log_execution_error(
+            node_type="llm_forwarding_standalone",
+            inputs=inputs,
+            error_message=str(e),
+            error_details=error_details
+        )
+        
+        print(f"独立LLM转发执行失败: {str(e)}")
+        
+        # 创建错误响应chunk
+        class ErrorChunk:
+            def __init__(self, error_content):
+                self.choices = [type('Choice', (), {
+                    'delta': type('Delta', (), {
+                        'content': f"Error: {error_content}",
+                        'role': 'assistant'
+                    })()
+                })()]
+        
+        yield ErrorChunk(str(e))
+
+
 def create_scenario_workflow():
     """Create the scenario update workflow."""
     builder = StateGraph(ParentState)
     
-    # Add nodes
+    # Add nodes - 只保留情景更新相关节点
     builder.add_node("memory_flashback", memory_flashback_node)
     builder.add_node("scenario_updater", scenario_updater_node)
-    builder.add_node("llm_forwarding", llm_forwarding_node)  # 新增LLM转发节点
     
-    # Add edges - 修改边：START → memory_flashback → scenario_updater → llm_forwarding → END
+    # Add edges - 移除llm_forwarding节点：START → memory_flashback → scenario_updater → END
     builder.add_edge(START, "memory_flashback")
     builder.add_edge("memory_flashback", "scenario_updater")
-    builder.add_edge("scenario_updater", "llm_forwarding")  # 新增边
-    builder.add_edge("llm_forwarding", END)  # 修改结束边
+    builder.add_edge("scenario_updater", END)  # 直接结束
     
     return builder.compile()
 

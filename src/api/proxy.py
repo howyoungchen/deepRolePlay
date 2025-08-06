@@ -140,6 +140,18 @@ class ProxyService:
                         if sse_chunk:
                             yield sse_chunk
                 
+                # 2.5. 调用独立的LLM转发函数进行流式输出
+                from src.workflow.graph.scenario_workflow import forward_to_llm_streaming
+                
+                async for chunk in forward_to_llm_streaming(
+                    original_messages=workflow_input["original_messages"],
+                    api_key=workflow_input["api_key"], 
+                    model=chat_request.model
+                ):
+                    sse_chunk = convert_chunk_to_sse(chunk, chat_request.model, request_id)
+                    if sse_chunk:
+                        yield sse_chunk
+                
                 # 3. 发送结束信号
                 yield create_done_message()
 
