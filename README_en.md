@@ -23,7 +23,7 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 - 💰 **Cost Control**: Scenario compression technology, long conversation costs reduced by 80%
 - 📚 **Intelligent Internet Access**: Integrated Wikipedia, free automatic completion of character backgrounds and story settings
 - ⚡ **Plug and Play**: 5-minute integration, direct use with SillyTavern and other platforms
-- 🚀 **Ultra-Fast Response**: Using Gemini 2.5 Flash intelligent agents, only 20-30 seconds longer than normal responses
+- 🚀 **Ultra-Fast Response**: Using open-source openai/gpt-oss-120b intelligent agents, only 20 seconds longer than normal responses
 
 ## 🎯 How to Use
 
@@ -35,7 +35,7 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
 
 2. **⚙️ Modify Configuration File**
    
-   Edit the `config.yaml` file, **Gemini 2.5 Flash is strongly recommended for intelligent agents (only 20 seconds longer response than normal)**:
+   Edit the `config.yaml` file, **Gemini 2.5 Flash or GPT OSS 120B is strongly recommended for intelligent agents (only 20 seconds longer response than normal)**:
 
    ```yaml
    # API Proxy Configuration - Forwarding Target
@@ -43,11 +43,16 @@ DeepRolePlay adopts a multi-agent division of labor architecture: **Memory Flash
      target_url: "https://api.deepseek.com/v1"                      # Your forwarding API address, DeepSeek recommended
      timeout: 60                                                     # Recommended 60 seconds
    
-   # Agent Configuration - Model used by Agent (Must be Gemini 2.5 Flash)
+   # Workflow Control Configuration
+   langgraph:
+     max_history_length: 7                                           # Number of historical messages passed to forwarding target LLM, controls context length and token consumption
+     stream_workflow_to_frontend: false                              # DRP workflow push switch, by default does not push DRP content to frontend, set to true and import deeproleplay.json regex in SillyTavern if push is needed
+   
+   # Agent Configuration - Model used by Agent (Recommended Gemini 2.5 Flash or GPT OSS 120B)
    agent:
-     model: "gemini-2.5-flash"                                       # Strongly recommended: Gemini 2.5 Flash
-     base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API address
-     api_key: "your-gemini-api-key"                                  # Your Gemini API Key
+     model: "openai/gpt-oss-120b"                                    # Recommended: gemini-2.5-flash or openai/gpt-oss-120b
+     base_url: "https://openrouter.ai/api/v1"                        # OpenRouter API address
+     api_key: "your-openrouter-api-key"                              # Fill in your OpenRouter API Key
      temperature: 0.7
      max_iterations: 25
    
@@ -130,31 +135,43 @@ uv pip install -r requirements.txt
 
 ### 2. Configure Service
 
-Edit `config/config.yaml` file, **Gemini 2.5 Flash is recommended (fast response)**:
+Edit `config/config.yaml` file, **Gemini 2.5 Flash or GPT OSS 120B is recommended (fast response)**:
 
 ```yaml
 # API Proxy Configuration - Forwarding Target
 proxy:
-  target_url: "https://api.deepseek.com/v1"                      # Your forwarding API address
-  timeout: 60                                                     # Request timeout (seconds)
-
-# Agent Configuration - Model used by Agent (Must be Gemini 2.5 Flash)
-agent:
-  model: "gemini-2.5-flash"                                       # Must use Gemini 2.5 Flash
-  base_url: "https://generativelanguage.googleapis.com/v1beta"   # Gemini API address
-  api_key: "your-gemini-api-key"                                  # Your Gemini API Key
-  temperature: 0.7                                                # Generation temperature (0-1)
-  max_iterations: 25                                              # Maximum iterations
+  target_url: "https://api.deepseek.com/v1"        # Your forwarding API address
+  timeout: 30                                       # Request timeout (seconds)
+  debug_mode: false                                 # Debug mode switch
 
 # Scenario Management
 scenario:
-  file_path: "./scenarios/scenario.txt"      # Scenario file path
-  update_enabled: true                        # Whether to enable automatic updates
+  file_path: "./scenarios/scenario.txt"            # Scenario file path
+
+# Workflow Control Configuration
+langgraph:
+  max_history_length: 7                            # Number of historical messages passed to forwarding target LLM, controls context length and token consumption
+  history_ai_message_offset: 1                     # Historical message calculation starting point
+  only_forward: false                               # Quick mode switch
+  stream_workflow_to_frontend: false               # DRP workflow push switch, by default does not push DRP content to frontend, set to true and import deeproleplay.json regex in SillyTavern if push is needed
+
+# Agent Configuration - Model used by Agent (Recommended Gemini 2.5 Flash or GPT OSS 120B)
+agent:
+  model: "openai/gpt-oss-120b"                 # Recommended: Gemini 2.5 Flash or openai/gpt-oss-120b
+  base_url: "https://openrouter.ai/api/v1"         # API service address (OpenRouter recommended)
+  api_key: "your-api-key"                          # Fill in your API Key
+  temperature: 0.1                                 # Generation temperature (0-1)
+  max_tokens: 8192                                 # Maximum output token count
+  top_p: 0.9                                       # Top-p sampling parameter
+  debug: false                                     # Debug mode
+  max_iterations: 40                               # Maximum processing rounds
+  timeout: 120                                     # Single request timeout
 
 # Server Configuration
 server:
   host: "0.0.0.0"
   port: 6666
+  reload: false                                    # Hot reload switch
 ```
 
 ### 3. Start Service
@@ -194,9 +211,15 @@ After packaging, `DeepRolePlay.exe` will be generated in the `dist/` directory, 
 ### 🔌 Full Compatibility with OpenAI Format API
 This project uses standard OpenAI API format, supporting all compatible service providers:
 
-- **🌟 Gemini 2.5 Flash** (Strongly Recommended): Fastest speed, only adds 20 seconds response time, excellent role-playing effects
-- **💰 DeepSeek**: Best cost-performance, low cost
+#### Recommended Models for Agents
+- **🌟 Gemini 2.5 Flash** (Strongly Recommended): Only adds 20 seconds response time, excellent role-playing effects
+- **🎯 GPT OSS 120B** (Strongly Recommended): Open-source model, excellent performance for agent tasks, lowest cost and fastest speed!
+- **💰 DeepSeek**: Slower speed
+
+#### Forwarding Target Models
 - **💻 Local Ollama**: Fully private deployment, data security
+- **🔥 DeepSeek**: High-quality dialogue, low cost
+- **⚡ Claude**: Clear logic, strong reasoning ability
 
 ### ⚠️ OpenAI Official API Not Recommended
 Although fully compatible with OpenAI format, **using OpenAI official service is not recommended**:

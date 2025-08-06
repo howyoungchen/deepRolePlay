@@ -9,7 +9,6 @@ __pycache__/
 *.pyd
 *.pkl
 .claude
-config.yaml
 *.spec
 dist/
 build/

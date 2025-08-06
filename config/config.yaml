@@ -1,0 +1,79 @@
+
+# ====================================================================
+# DeepRolePlay Configuration File - Beginner's Guide
+# ====================================================================
+# 
+# 🤔 What are "Forwarding LLM" and "Agent LLM"?
+# 
+# 【Forwarding LLM】= The AI model you actually want to chat with
+# • This is the AI that ultimately chats with users, like DeepSeek, Claude, GPT, etc.
+# • The API Key you fill in SillyTavern is for this model
+# • Configuration location: proxy section below
+# 
+# 【Agent LLM】= Behind-the-scenes intelligent assistant AI model  
+# • Responsible for "memory flashback" and "scenario update", users don't see its replies
+# • Recommended to use cheap and fast models, like Gemini 2.5 Flash (large free quota)
+# • Configuration location: agent section below
+# 
+# 💡 Example:
+# - Forwarding LLM: DeepSeek (cheap, chats with users) → fill base_url in proxy section, api_key and other configs in your frontend. Frontend should fill base_url as http://localhost:6666/api/v1
+# - Agent LLM: Gemini (free, background work) → fill in agent section
+# - You need two different API Keys!
+# 
+# 🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forwarding LLM generates reply
+# ====================================================================
+
+# 【API Proxy Configuration】Forward to target LLM service
+proxy:
+  # Final LLM service address | Controls request forwarding target | Need to change: Fill in your LLM service API address
+  target_url: "https://api.deepseek.com/v1"
+  # HTTP request timeout (seconds) | Controls request wait time | Usually no need to change: 30 seconds is enough
+  timeout: 30
+  # Debug mode switch | Controls whether to skip workflow and return test message directly | Usually no need to change: false for normal operation
+  debug_mode: false
+
+# 【Scenario File Configuration】Character state storage
+scenario:
+  # Scenario file storage path | Controls character state save location | Usually no need to change: auto-create directory
+  file_path: "./scenarios/scenario.txt"
+
+# 【Workflow Control Configuration】Agent execution parameters
+langgraph:
+  # Number of history messages passed to target LLM | Controls context length and token consumption | Adjustable: 3-15 messages, affects memory effectiveness and cost
+  max_history_length: 7
+  # History message start offset | Controls message calculation start point | Usually no need to change: technical parameter
+  history_ai_message_offset: 1
+  # Fast forward mode | Controls whether to skip Agent and forward directly | Usually no need to change: false for normal operation
+  only_forward: false
+  # Workflow frontend streaming switch | Controls whether to push agent reasoning process to frontend | Adjustable: true shows reasoning process, false shows only final conversation
+  stream_workflow_to_frontend: false
+
+# 【Agent Configuration】AI model for memory flashback and scenario update
+agent:
+  # AI model name | Controls which AI model to use | Using DeepSeek as agent model
+  model: "openai/gpt-oss-120b"
+  # Generation randomness (0-1) | Controls answer creativity | Adjustable: 0.1 stable, 0.7 creative, affects consistency
+  temperature: 0.1
+  # API service provider address | Controls model call interface | Using DeepSeek API
+  base_url: "https://openrouter.ai/api/v1"
+  # API access key | Controls service authentication | Need to change: Fill in your OpenRouter API key
+  api_key: "Your-OpenRouter-API-Key"
+  # Maximum output tokens | Controls single generation length limit | Usually no need to change: 8192 is enough for most scenarios
+  max_tokens: 8192
+  # Sampling probability threshold (0-1) | Controls vocabulary selection range | Usually no need to change: 0.9 ensures diversity
+  top_p: 0.9
+  # Agent debug info | Controls whether to show detailed execution process | Change when debugging: true shows process, false normal operation
+  debug: false
+  # Maximum execution rounds | Controls upper limit to prevent infinite loops | Usually no need to change: 40 rounds enough for complex tasks
+  max_iterations: 40
+  # Single request timeout (seconds) | Controls Agent call wait time | Adjustable: can increase to 180 for slow networks
+  timeout: 120
+
+# 【Server Configuration】DeepRolePlay service network settings
+server:
+  # Listen IP address | Controls external access permissions | Usually no need to change: 0.0.0.0 allows LAN access
+  host: "0.0.0.0"
+  # Service port number | Controls frontend connection port | Adjustable: if occupied will auto +1, frontend needs corresponding modification
+  port: 6666
+  # Code hot reload | Controls auto-restart during development | Usually no need to change: false avoids accidental restart in production
+  reload: false
