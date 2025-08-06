@@ -1,6 +1,6 @@
 """
-Scenario Management Module
-Responsible for scenario file management and workflow scheduling
+场景管理模块
+负责场景文件管理和工作流调度
 """
 import os
 import aiofiles
@@ -11,39 +11,39 @@ from config.manager import settings
 
 
 class ScenarioManager:
-    """Scenario Manager"""
+    """场景管理器"""
     
     def __init__(self):
-        """Initializes the Scenario Manager."""
-        # Get the scenario file path from the configuration, or use the default value if it does not exist.
+        """初始化场景管理器。"""
+        # 从配置中获取场景文件路径，如果不存在则使用默认值。
         if hasattr(settings, 'scenario') and hasattr(settings.scenario, 'file_path'):
             self.scenario_file_path = settings.scenario.file_path
         else:
             self.scenario_file_path = "./scenarios/current_scenario.txt"
         
-        # Ensure that the scenarios directory exists.
+        # 确保场景目录存在。
         os.makedirs(os.path.dirname(self.scenario_file_path), exist_ok=True)
     
     
     async def update_scenario(self, workflow_input: Dict[str, Any]):
         """
-        Synchronously updates the scenario, waits for completion, and returns the LLM response.
+        同步更新场景，等待完成，并返回 LLM 响应。
         
-        Args:
-            workflow_input: Complete workflow input including messages, api_key, model, etc.
+        参数:
+            workflow_input: 完整的工​​作流输入，包括消息、api_key、模型等。
             
-        Returns:
-            The LLM response object.
+        返回:
+            LLM 响应对象。
         """
         try:
-            # Dynamically import the new workflow to avoid circular dependencies.
+            # 动态导入新的工作流以避免循环依赖。
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
-            # Create and stream the workflow.
+            # 创建并流式传输工作流。
             workflow = create_scenario_workflow()
             final_result = None
             
-            # Use astream_events to get streaming events and wait for final result
+            # 使用 astream_events 获取流式事件并等待最终结果
             async for event in workflow.astream_events(workflow_input, version="v2"):
                 if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
                     final_result = event.get("data", {}).get("output", {})
@@ -52,34 +52,34 @@ class ScenarioManager:
             return final_result.get("llm_response") if final_result else None
     
         except Exception as e:
-            raise RuntimeError(f"Failed to update scenario: {str(e)}")
+            raise RuntimeError(f"更新场景失败: {str(e)}")
     
     async def update_scenario_streaming(self, workflow_input: Dict[str, Any]):
         """
-        Updates the scenario in a streaming fashion, returning streaming events from the workflow execution.
+        以流式方式更新场景，返回工作流执行中的流式事件。
         
-        Args:
-            workflow_input: Complete workflow input including messages, api_key, model, etc.
+        参数:
+            workflow_input: 完整的工​​作流输入，包括消息、api_key、模型等。
             
-        Yields:
-            Streaming events from the workflow execution.
+        产生:
+            来自工作流执行的流式事件。
         """
         try:
-            # Dynamically import the new workflow to avoid circular dependencies.
+            # 动态导入新的工作流以避免循环依赖。
             from src.workflow.graph.scenario_workflow import create_scenario_workflow
             
-            # Create the workflow.
+            # 创建工作流。
             workflow = create_scenario_workflow()
             
-            # Use astream_events to get streaming events.
+            # 使用 astream_events 获取流式事件。
             async for event in workflow.astream_events(workflow_input, version="v2"):
                 yield event
     
         except Exception as e:
-            print(f"Error: Failed to update scenario in streaming mode: {str(e)}")
-            raise RuntimeError(f"Failed to update scenario in streaming mode: {str(e)}")
+            print(f"错误：在流模式下更新场景失败: {str(e)}")
+            raise RuntimeError(f"在流模式下更新场景失败: {str(e)}")
 
 
 
-# Global instance
+# 全局实例
 scenario_manager = ScenarioManager()
