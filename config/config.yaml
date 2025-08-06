@@ -12,12 +12,12 @@
 # 
 # 【Agent LLM】= Behind-the-scenes intelligent assistant AI model  
 # • Responsible for "memory flashback" and "scenario update", users don't see its replies
-# • Recommended to use cheap and fast models, like Gemini 2.5 Flash (large free quota)
+# • Recommended to use Gemini 2.5 Flash (fast response)
 # • Configuration location: agent section below
 # 
 # 💡 Example:
 # - Forwarding LLM: DeepSeek (cheap, chats with users) → fill base_url in proxy section, api_key and other configs in your frontend. Frontend should fill base_url as http://localhost:6666/api/v1
-# - Agent LLM: Gemini (free, background work) → fill in agent section
+# - Agent LLM: Gemini 2.5 Flash (background work) → fill in agent section
 # - You need two different API Keys!
 # 
 # 🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forwarding LLM generates reply
@@ -50,8 +50,8 @@ langgraph:
 
 # 【Agent Configuration】AI model for memory flashback and scenario update
 agent:
-  # AI model name | Controls which AI model to use | Using DeepSeek as agent model
-  model: "openai/gpt-oss-120b"
+  # AI model name | Controls which AI model to use | Using Gemini 2.5 Flash as agent model
+  model: "google/gemini-2.5-flash"
   # Generation randomness (0-1) | Controls answer creativity | Adjustable: 0.1 stable, 0.7 creative, affects consistency
   temperature: 0.1
   # API service provider address | Controls model call interface | Using DeepSeek API

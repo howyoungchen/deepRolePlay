@@ -44,7 +44,7 @@ def read_target_file(file_path: str) -> str:
             formatted_lines.append(f"{i:6d}→{line}")
         
         content = '\n'.join(formatted_lines)
-        print(f"成功读取文件: {file_path}, 行数: {len(lines)}")
+        print(f"Successfully read file: {file_path}, lines: {len(lines)}")
         return content
         
     except Exception as e:

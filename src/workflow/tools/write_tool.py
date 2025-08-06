@@ -12,37 +12,37 @@ from langchain_core.tools import tool
 
 def validate_file_path(file_path: str, root_dir: Optional[str] = None) -> Optional[str]:
     """
-    验证文件路径的有效性
+    Validate file path validity
     
     Args:
-        file_path: 要验证的文件路径
-        root_dir: 根目录，默认为当前工作目录
+        file_path: File path to validate
+        root_dir: Root directory, defaults to current working directory
         
     Returns:
-        错误消息，如果路径有效则返回 None
+        Error message, or None if path is valid
     """
     if not root_dir:
         root_dir = os.getcwd()
     
-    # 检查是否为绝对路径
+    # Check if it's an absolute path
     if not os.path.isabs(file_path):
-        return f"文件路径必须是绝对路径: {file_path}"
+        return f"File path must be absolute: {file_path}"
     
-    # 检查路径是否在根目录内
+    # Check if path is within root directory
     try:
         abs_file_path = os.path.abspath(file_path)
         abs_root_dir = os.path.abspath(root_dir)
         
-        # 使用 commonpath 检查路径关系
+        # Use commonpath to check path relationship
         if not abs_file_path.startswith(abs_root_dir):
-            return f"文件路径必须在根目录内 ({abs_root_dir}): {file_path}"
+            return f"File path must be within root directory ({abs_root_dir}): {file_path}"
     except (ValueError, OSError) as e:
-        return f"路径验证错误: {str(e)}"
+        return f"Path validation error: {str(e)}"
     
-    # 检查如果路径存在，确保不是目录
+    # Check if path exists, ensure it's not a directory
     if os.path.exists(file_path):
         if os.path.isdir(file_path):
-            return f"路径是目录而非文件: {file_path}"
+            return f"Path is a directory, not a file: {file_path}"
     
     return None
 
@@ -50,60 +50,60 @@ def validate_file_path(file_path: str, root_dir: Optional[str] = None) -> Option
 @tool
 def write_file(file_path: str, content: str, root_dir: Optional[str] = None) -> str:
     """
-    将内容写入指定文件。如果目录不存在会自动创建。
+    Write content to specified file. Creates directories automatically if they don't exist.
     
     Args:
-        file_path: 要写入的文件的绝对路径
-        content: 要写入的内容
-        root_dir: 根目录，默认为当前工作目录
+        file_path: Absolute path of the file to write to
+        content: Content to write
+        root_dir: Root directory, defaults to current working directory
         
     Returns:
-        操作结果消息
+        Operation result message
     """
     try:
-        # 验证参数
+        # Validate parameters
         validation_error = validate_file_path(file_path, root_dir)
         if validation_error:
-            return f"错误: 参数无效。原因: {validation_error}"
+            return f"Error: Invalid parameters. Reason: {validation_error}"
         
-        # 检查文件是否已存在
+        # Check if file already exists
         file_exists = os.path.exists(file_path)
         
-        # 创建目录（如果不存在）
+        # Create directory if it doesn't exist
         dir_name = os.path.dirname(file_path)
         if not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
         
-        # 写入文件
+        # Write file
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        # 返回成功消息
+        # Return success message
         if file_exists:
-            return f"成功覆写文件: {file_path}"
+            return f"Successfully overwrote file: {file_path}"
         else:
-            return f"成功创建并写入新文件: {file_path}"
+            return f"Successfully created and wrote new file: {file_path}"
             
     except PermissionError:
-        return f"错误: 权限被拒绝，无法写入文件: {file_path}"
+        return f"Error: Permission denied, cannot write file: {file_path}"
     except OSError as e:
-        return f"错误: 文件系统错误: {str(e)}"
+        return f"Error: File system error: {str(e)}"
     except Exception as e:
-        return f"错误: 写入文件时发生未知错误: {str(e)}"
+        return f"Error: Unknown error occurred while writing file: {str(e)}"
 
 
 def test_langchain_tool_interface():
-    """测试 LangChain 工具接口"""
-    print("=== LangChain Tool Interface 测试 ===")
-    print(f"工具名称: {write_file.name}")
-    print(f"工具描述: {write_file.description}")
-    print(f"工具参数: {write_file.args}")
-    print(f"工具类型: {type(write_file)}")
+    """Test LangChain tool interface"""
+    print("=== LangChain Tool Interface Test ===")
+    print(f"Tool name: {write_file.name}")
+    print(f"Tool description: {write_file.description}")
+    print(f"Tool args: {write_file.args}")
+    print(f"Tool type: {type(write_file)}")
     
-    # 测试工具 schema
+    # Test tool schema
     schema = write_file.args_schema
     if schema:
-        print(f"参数 schema: {schema.model_json_schema()}")
+        print(f"Args schema: {schema.model_json_schema()}")
     
     print("\n")
 
@@ -112,92 +112,92 @@ if __name__ == "__main__":
     import tempfile
     import shutil
     
-    # 首先测试 LangChain 工具接口
+    # First test LangChain tool interface
     test_langchain_tool_interface()
     
-    print("=== Write Tool 测试 ===\n")
+    print("=== Write Tool Test ===\n")
     
-    # 创建临时测试目录
+    # Create temporary test directory
     test_root = tempfile.mkdtemp(prefix="write_tool_test_")
-    print(f"测试根目录: {test_root}")
+    print(f"Test root directory: {test_root}")
     
     try:
-        # 测试1: 创建新文件
-        print("\n1. 测试创建新文件:")
+        # Test 1: Create new file
+        print("\n1. Test creating new file:")
         test_file1 = os.path.join(test_root, "test1.txt")
         result1 = write_file.invoke({"file_path": test_file1, "content": "Hello, World!", "root_dir": test_root})
-        print(f"结果: {result1}")
-        print(f"文件存在: {os.path.exists(test_file1)}")
+        print(f"Result: {result1}")
+        print(f"File exists: {os.path.exists(test_file1)}")
         if os.path.exists(test_file1):
             with open(test_file1, 'r', encoding='utf-8') as f:
-                print(f"文件内容: {repr(f.read())}")
+                print(f"File content: {repr(f.read())}")
         
-        # 测试2: 覆写现有文件
-        print("\n2. 测试覆写现有文件:")
+        # Test 2: Overwrite existing file
+        print("\n2. Test overwriting existing file:")
         result2 = write_file.invoke({"file_path": test_file1, "content": "Updated content!", "root_dir": test_root})
-        print(f"结果: {result2}")
+        print(f"Result: {result2}")
         if os.path.exists(test_file1):
             with open(test_file1, 'r', encoding='utf-8') as f:
-                print(f"更新后内容: {repr(f.read())}")
+                print(f"Updated content: {repr(f.read())}")
         
-        # 测试3: 自动创建目录
-        print("\n3. 测试自动创建目录:")
+        # Test 3: Auto-create directories
+        print("\n3. Test auto-creating directories:")
         test_file3 = os.path.join(test_root, "subdir", "nested", "test3.txt")
         result3 = write_file.invoke({"file_path": test_file3, "content": "Nested file content", "root_dir": test_root})
-        print(f"结果: {result3}")
-        print(f"目录存在: {os.path.exists(os.path.dirname(test_file3))}")
-        print(f"文件存在: {os.path.exists(test_file3)}")
+        print(f"Result: {result3}")
+        print(f"Directory exists: {os.path.exists(os.path.dirname(test_file3))}")
+        print(f"File exists: {os.path.exists(test_file3)}")
         
-        # 测试4: 相对路径错误
-        print("\n4. 测试相对路径错误:")
+        # Test 4: Relative path error
+        print("\n4. Test relative path error:")
         result4 = write_file.invoke({"file_path": "relative_path.txt", "content": "content", "root_dir": test_root})
-        print(f"结果: {result4}")
+        print(f"Result: {result4}")
         
-        # 测试5: 路径在根目录外错误
-        print("\n5. 测试路径在根目录外错误:")
+        # Test 5: Path outside root directory error
+        print("\n5. Test path outside root directory error:")
         outside_path = "/tmp/outside_test.txt"
         result5 = write_file.invoke({"file_path": outside_path, "content": "content", "root_dir": test_root})
-        print(f"结果: {result5}")
+        print(f"Result: {result5}")
         
-        # 测试6: 目标是目录而非文件
-        print("\n6. 测试目标是目录而非文件:")
+        # Test 6: Target is directory not file
+        print("\n6. Test target is directory not file:")
         test_dir = os.path.join(test_root, "test_directory")
         os.makedirs(test_dir, exist_ok=True)
         result6 = write_file.invoke({"file_path": test_dir, "content": "content", "root_dir": test_root})
-        print(f"结果: {result6}")
+        print(f"Result: {result6}")
         
-        # 测试7: 空内容
-        print("\n7. 测试空内容:")
+        # Test 7: Empty content
+        print("\n7. Test empty content:")
         test_file7 = os.path.join(test_root, "empty.txt")
         result7 = write_file.invoke({"file_path": test_file7, "content": "", "root_dir": test_root})
-        print(f"结果: {result7}")
+        print(f"Result: {result7}")
         if os.path.exists(test_file7):
             with open(test_file7, 'r', encoding='utf-8') as f:
                 content = f.read()
-                print(f"文件内容长度: {len(content)}")
+                print(f"File content length: {len(content)}")
         
-        # 测试8: 包含特殊字符的内容
-        print("\n8. 测试特殊字符内容:")
+        # Test 8: Content with special characters
+        print("\n8. Test special character content:")
         test_file8 = os.path.join(test_root, "special_chars.txt")
-        special_content = "特殊字符: 中文, émojis: 🚀, newlines:\nline2\nline3"
+        special_content = "Special chars: Chinese, émojis: 🚀, newlines:\nline2\nline3"
         result8 = write_file.invoke({"file_path": test_file8, "content": special_content, "root_dir": test_root})
-        print(f"结果: {result8}")
+        print(f"Result: {result8}")
         if os.path.exists(test_file8):
             with open(test_file8, 'r', encoding='utf-8') as f:
                 read_content = f.read()
-                print(f"内容匹配: {special_content == read_content}")
+                print(f"Content matches: {special_content == read_content}")
         
-        # 测试9: 大文件内容
-        print("\n9. 测试大文件内容:")
+        # Test 9: Large file content
+        print("\n9. Test large file content:")
         test_file9 = os.path.join(test_root, "large_file.txt")
-        large_content = "Large content line\n" * 1000  # 1000 行
+        large_content = "Large content line\n" * 1000  # 1000 lines
         result9 = write_file.invoke({"file_path": test_file9, "content": large_content, "root_dir": test_root})
-        print(f"结果: {result9}")
+        print(f"Result: {result9}")
         if os.path.exists(test_file9):
-            print(f"文件大小: {os.path.getsize(test_file9)} bytes")
+            print(f"File size: {os.path.getsize(test_file9)} bytes")
         
-        print(f"\n=== 测试完成 ===")
-        print(f"测试目录中的文件:")
+        print(f"\n=== Test Complete ===")
+        print(f"Files in test directory:")
         for root, dirs, files in os.walk(test_root):
             level = root.replace(test_root, '').count(os.sep)
             indent = ' ' * 2 * level
@@ -209,6 +209,6 @@ if __name__ == "__main__":
                 print(f"{subindent}{file} ({size} bytes)")
     
     finally:
-        # 清理测试目录
+        # Clean up test directory
         shutil.rmtree(test_root)
-        print(f"\n已清理测试目录: {test_root}")
+        print(f"\nCleaned up test directory: {test_root}")

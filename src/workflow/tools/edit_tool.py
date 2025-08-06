@@ -316,7 +316,7 @@ if __name__ == "__main__":
             assert "No changes to apply" in result
             print("✓ Identical strings test passed")
             
-            print("\n🎉 All tests passed!")
+            print("\n✓ All tests passed!")
             
         finally:
             # Clean up

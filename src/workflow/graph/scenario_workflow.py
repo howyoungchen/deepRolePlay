@@ -128,6 +128,8 @@ def extract_memory_flashback_result(response: Dict[str, Any]) -> str:
 
 async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
     """Memory flashback node function."""
+    print("🧠Starting memory flashback node execution...",flush=True)
+    
     # 检查是否开启only_forward模式，如果是则跳过该节点
     if settings.langgraph.only_forward:
         return {
@@ -221,6 +223,7 @@ async def memory_flashback_node(state: ParentState) -> Dict[str, Any]:
 
 
 async def scenario_updater_node(state: ParentState) -> Dict[str, Any]:
+    print("📖Starting scenario updater node execution...", flush=True)
     """Scenario updater node function."""
     # 检查是否开启only_forward模式，如果是则跳过该节点
     if settings.langgraph.only_forward:
