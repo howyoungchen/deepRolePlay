@@ -395,7 +395,7 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
                             # 创建一个包含<think>标签的新chunk
                             from copy import deepcopy
                             think_start_chunk = deepcopy(chunk)
-                            think_start_chunk.choices[0].delta.content = "<think>"
+                            think_start_chunk.choices[0].delta.content = "<think>\n"
                             if hasattr(think_start_chunk.choices[0].delta, 'reasoning_content'):
                                 think_start_chunk.choices[0].delta.reasoning_content = None
                             yield think_start_chunk
@@ -414,7 +414,7 @@ async def llm_forwarding_node(state: ParentState) -> Dict[str, Any]:
                             # 创建包含</think>结束标签的chunk
                             from copy import deepcopy
                             think_end_chunk = deepcopy(chunk)
-                            think_end_chunk.choices[0].delta.content = "</think>\n"
+                            think_end_chunk.choices[0].delta.content = "\n</think>\n"
                             yield think_end_chunk
                             content_started = True
                         
@@ -611,7 +611,7 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
                     # 创建一个包含<think>标签的新chunk
                     from copy import deepcopy
                     think_start_chunk = deepcopy(chunk)
-                    think_start_chunk.choices[0].delta.content = "<think>"
+                    think_start_chunk.choices[0].delta.content = "<think>\n"
                     if hasattr(think_start_chunk.choices[0].delta, 'reasoning_content'):
                         think_start_chunk.choices[0].delta.reasoning_content = None
                     yield think_start_chunk
@@ -630,7 +630,7 @@ async def forward_to_llm_streaming(original_messages: List[Dict], api_key: str, 
                     # 创建包含</think>结束标签的chunk
                     from copy import deepcopy
                     think_end_chunk = deepcopy(chunk)
-                    think_end_chunk.choices[0].delta.content = "</think>\n"
+                    think_end_chunk.choices[0].delta.content = "\n</think>\n"
                     yield think_end_chunk
                     content_started = True
                 
