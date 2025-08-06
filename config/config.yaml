@@ -45,6 +45,8 @@ langgraph:
   history_ai_message_offset: 1
   # 快速转发模式｜控制是否跳过Agent直接转发｜一般不需要改：false为正常工作
   only_forward: false
+  # 工作流前端推流开关｜控制是否将智能体推理过程推送到前端｜可调整：true显示推理过程，false只显示最终对话
+  stream_workflow_to_frontend: true
 
 # 【Agent智能体配置】记忆闪回和情景更新的AI模型
 agent:

@@ -117,7 +117,7 @@ class ProxyService:
         request_id = str(uuid.uuid4())
         
         from src.scenario.manager import scenario_manager
-        from utils.format_converter import convert_chunk_to_sse, convert_workflow_event_to_sse, create_done_message
+        from utils.format_converter import convert_chunk_to_sse, convert_workflow_event_to_sse, convert_chunk_to_sse_manual, create_done_message
         
         async def stream_generator():
             """生成器，用于处理工作流并流式传输LLM响应"""
@@ -128,14 +128,25 @@ class ProxyService:
                 )
                 workflow_input["stream"] = True
                 
-                # 2. 使用ScenarioManager的流式方法
+                # 2. 智能体推理开始标记
+                if settings.langgraph.stream_workflow_to_frontend:
+                    agent_start_chunk = convert_chunk_to_sse_manual("<deepRolePlay>\n", chat_request.model, request_id)
+                    yield agent_start_chunk
+                
+                # 3. 使用ScenarioManager的流式方法
                 async for event in scenario_manager.update_scenario_streaming(workflow_input):
                     # 使用综合的工作流事件转换函数，支持多种事件类型
-                    sse_chunk = convert_workflow_event_to_sse(event, chat_request.model, request_id)
-                    if sse_chunk:
-                        yield sse_chunk
+                    if settings.langgraph.stream_workflow_to_frontend:
+                        sse_chunk = convert_workflow_event_to_sse(event, chat_request.model, request_id)
+                        if sse_chunk:
+                            yield sse_chunk
                 
-                # 3. 调用独立的LLM转发函数进行流式输出
+                # 4. 智能体推理结束标记
+                if settings.langgraph.stream_workflow_to_frontend:
+                    agent_end_chunk = convert_chunk_to_sse_manual("\n</deepRolePlay>", chat_request.model, request_id)
+                    yield agent_end_chunk
+                
+                # 5. 调用独立的LLM转发函数进行流式输出
                 from src.workflow.graph.scenario_workflow import forward_to_llm_streaming
                 
                 async for chunk in forward_to_llm_streaming(
@@ -147,7 +158,7 @@ class ProxyService:
                     if sse_chunk:
                         yield sse_chunk
                 
-                # 4. 发送结束信号
+                # 6. 发送结束信号
                 yield create_done_message()
 
             except Exception as e:

@@ -45,6 +45,7 @@ class LangGraphConfig(BaseModel):
     max_history_length: int = 20
     history_ai_message_offset: int = 1  # Start counting history from the Nth-to-last AI message.
     only_forward: bool = False  # 当为true时跳过记忆闪回和情景更新节点，直接转发到LLM
+    stream_workflow_to_frontend: bool = True  # 控制是否将工作流推理过程推送到前端
 
 
 class AgentConfig(BaseModel):
