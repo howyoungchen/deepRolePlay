@@ -1,0 +1,331 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 项目概述
+
+DeepRolePlay是一个基于FastAPI的AI角色扮演代理系统，使用LangGraph工作流管理情景更新和记忆闪回功能。系统提供OpenAI兼容的HTTP代理服务，通过多智能体架构解决角色遗忘问题。
+
+## 核心架构
+
+### 技术栈
+- **Web框架**: FastAPI + uvicorn
+- **AI工作流**: LangGraph + LangChain
+- **HTTP客户端**: httpx + OpenAI SDK (用于LLM转发)
+- **配置管理**: Pydantic + PyYAML
+- **外部知识**: Wikipedia API
+- **依赖管理**: UV (推荐) 或 pip
+- **Python版本**: 3.12
+
+### 关键执行流程
+
+1. **请求代理流程**: HTTP请求 → 情景注入 (`utils/messages_process.py`) → 工作流执行 → 目标API调用 → 响应返回
+2. **工作流执行**: 记忆闪回节点 → 情景更新节点 → 文件写入
+3. **配置加载**: 支持命令行参数 `--config_path` 指定配置文件路径
+4. **端口管理**: 自动检测端口占用，从配置端口开始递增查找可用端口（最多尝试20个）
+
+### 主要组件
+
+1. **HTTP代理服务** (`src/api/proxy.py`)
+   - OpenAI兼容的 `/v1/chat/completions` 接口
+   - ProxyService类处理转发逻辑，支持流式和非流式响应
+   - 自动调用scenario_manager执行工作流
+   - 处理API密钥转发和请求头管理
+
+2. **工作流系统** (`src/workflow/graph/`)
+   - **多Agent工作流** (`scenario_workflow.py`): 记忆闪回Agent + 情景更新Agent的完整工作流
+   - **快速工作流** (`fast_scenario_workflow.py`): 2次LLM调用的优化版本，快速响应
+   - **转发工作流** (`forward_workflow.py`): 独立的LLM转发工作流，支持直通模式
+   - ParentState/FastState状态管理，包含messages、current_scenario、memory_flashback
+   - 使用LangGraph创建有向无环图工作流
+
+3. **情景管理** (`src/scenario/manager.py`)
+   - ScenarioManager协调工作流执行
+   - 支持流式事件输出到前端
+   - 管理scenario文件的读写操作
+
+4. **配置系统** (`config/manager.py`)
+   - 基于Pydantic的配置管理
+   - 支持YAML文件和命令行参数
+   - ProxyConfig、AgentConfig、LangGraphConfig等结构化配置
+   - 支持从当前目录或指定路径加载配置
+   - 双重配置：Agent模型配置 + 转发目标LLM配置分离
+
+## 常用命令
+
+### 启动生产服务器
+```bash
+python main.py
+# 或使用uv（推荐）
+uv run python main.py
+```
+
+### 启动开发服务器（带热重载）
+```bash
+uvicorn main:app --host 0.0.0.0 --port 6666 --reload
+```
+
+### 环境要求
+- Python 3.12
+- UV 包管理器（推荐）
+
+### 安装依赖
+```bash
+# 使用uv安装（推荐）
+uv pip install -r requirements.txt
+
+# 验证关键依赖是否正确安装
+PYTHONPATH=. uv run python -c "import langgraph; print('langgraph imported successfully')"
+```
+
+### 测试工作流
+```bash
+# 测试完整工作流（包含记忆闪回和情景更新）
+PYTHONPATH=. uv run python src/workflow/graph/scenario_workflow.py
+
+# 测试快速工作流（2次LLM调用版本）
+PYTHONPATH=. uv run python src/workflow/graph/fast_scenario_workflow.py
+
+# 测试转发工作流
+PYTHONPATH=. uv run python src/workflow/graph/forward_workflow.py
+
+# 测试重构后的工作流
+PYTHONPATH=. uv run python unit_test_script/test_refactored_workflow.py
+
+# 测试LLM转发和流式功能
+PYTHONPATH=. uv run python unit_test_script/test_forward_llm_streaming.py
+
+# 使用timeout避免长时间阻塞（推荐）
+PYTHONPATH=. timeout 60 uv run python src/workflow/graph/scenario_workflow.py
+```
+
+### 测试单个Agent功能
+```bash
+# 测试记忆闪回Agent（需要先配置API密钥）
+PYTHONPATH=. uv run python -c "
+from src.workflow.graph.scenario_updater import MemoryFlashbackAgent
+import asyncio
+
+async def test_memory_only():
+    agent = MemoryFlashbackAgent()
+    
+    history = [
+        {'role': 'user', 'content': '我想了解embedding和向量检索的技术。'},
+        {'role': 'assistant', 'content': '这些是现代AI系统的重要组件。'}
+    ]
+    
+    current_scenario = '张三是数据科学家，正在研究向量数据库'
+    result = await agent.search_memories(current_scenario, history)
+    print('记忆闪回结果:')
+    print(result)
+
+asyncio.run(test_memory_only())
+"
+```
+
+### 单独测试HTTP代理服务
+```bash
+# 测试代理服务（需要已启动服务）
+curl -X POST http://localhost:6666/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": false
+  }'
+```
+
+### 指定配置文件启动
+```bash
+python main.py --config_path /path/to/config.yaml
+```
+
+### 打包为可执行文件
+```bash
+# 使用PyInstaller打包
+pyinstaller --name DeepRolePlay --onefile --clean --console --add-data "src;src" --add-data "utils;utils" main.py
+```
+
+## 配置文件结构
+
+`config/config.yaml` 主配置文件包含：
+- `proxy`: 转发目标LLM的API配置（target_url、timeout、debug_mode）
+- `agent`: Agent模型配置（base_url、api_key、model、temperature等）
+- `langgraph`: 工作流参数（max_history_length、workflow_type、stream_workflow_to_frontend等）
+- `scenario`: 情景文件路径配置
+- `server`: 服务器配置（host、port、reload）
+
+### 重要配置说明
+- **双重LLM配置**: Agent LLM（后台处理） + 转发目标LLM（用户对话）
+- **工作流类型**: 支持 "fast" 快速模式 和 "pro" 专业模式
+- **历史长度控制**: `max_history_length` 控制转发给目标LLM的消息数量
+
+## 文件结构重点
+
+- `scenarios/`: 动态生成的情景文件存储
+- `logs/proxy/`: 结构化JSON日志输出
+- `src/prompts/`: 记忆闪回和情景更新的提示词模板
+- `src/workflow/tools/`: LangGraph工具集（思考、搜索、文件操作）
+- `utils/`: 消息处理、日志、流转换等工具
+
+## 开发注意事项
+
+- 系统在端口6666提供服务，可通过config.yaml修改
+- 工作流使用异步执行，所有节点支持流式事件输出
+- 情景文件路径动态获取，由`utils/scenario_utils.py`管理
+- 配置系统支持运行时通过命令行参数覆盖
+- 记忆闪回使用Wikipedia API（可配置中英文），返回压缩的相关信息
+- 所有API调用和工具执行都在LangGraph代理框架内进行
+- 日志系统使用结构化JSON格式，便于后续分析
+- **测试时务必设置PYTHONPATH环境变量**，避免模块导入错误
+- 使用`timeout`命令包装测试脚本，避免长时间阻塞（推荐30-60秒）
+- **工作流类型可配置**: `workflow_type: "fast"` 或 `"pro"`，影响执行速度和功能完整性
+- **流式推送控制**: `stream_workflow_to_frontend` 控制Agent推理过程是否显示给用户
+
+## 调试和日志
+
+### 查看运行日志
+```bash
+# 查看最新的日志文件
+ls -la logs/proxy/
+
+# 实时监控日志
+tail -f logs/proxy/$(ls -t logs/proxy/ | head -1)
+```
+
+### 调试Agent工作流
+在 `config/config.yaml` 中设置：
+```yaml
+agent:
+  debug: true  # 启用调试模式，输出详细的Agent执行信息
+```
+
+### 修改日志级别
+```yaml
+system:
+  log_level: "DEBUG"  # INFO, DEBUG, WARNING, ERROR
+```
+
+### 检查配置文件语法
+```bash
+# 验证YAML配置文件语法
+python -c "import yaml; yaml.safe_load(open('config/config.yaml'))"
+```
+
+### 端口冲突处理
+系统会自动检测端口占用，从配置的端口开始递增查找可用端口（最多尝试20个）。实际使用的端口会在终端输出中显示。
+
+### 常见开发调试
+```bash
+# 检查端口占用情况
+lsof -i :6666
+
+# 终止占用端口的进程
+pkill -f "python main.py"
+
+# 清理scenario文件（重置角色状态）
+rm -f scenarios/scenario.txt
+
+# 测试特定工作流类型
+# 快速模式测试
+PYTHONPATH=. timeout 60 uv run python src/workflow/graph/fast_scenario_workflow.py
+
+# 检查依赖安装
+PYTHONPATH=. uv run python -c "import langgraph, langchain, fastapi; print('All dependencies OK')"
+
+# 验证配置文件
+python -c "import yaml; print('Config valid:', bool(yaml.safe_load(open('config/config.yaml'))))"
+```
+
+## 项目特性
+
+### API兼容性
+- 完全兼容OpenAI Chat Completions API格式
+- 支持流式(SSE)和非流式响应
+- 自动处理API密钥转发
+- 支持所有OpenAI兼容的模型服务商
+
+### 工作流工具
+- **思考工具** (`sequential_thinking.py`): 顺序思考和推理
+- **搜索工具** (`re_search_tool.py`): 基于正则的内容搜索
+- **读取工具** (`read_tool.py`): 文件读取操作
+- **写入工具** (`write_tool.py`): 文件写入操作
+- **编辑工具** (`edit_tool.py`): 文件编辑操作
+
+### 错误处理
+- 自动端口递增机制，避免端口冲突
+- 详细的错误日志记录（JSON格式）
+- 工作流执行异常捕获和处理
+- HTTP请求超时和重试机制
+
+## 架构细节
+
+### 数据流向
+```
+HTTP请求 → ProxyService → 
+  ↓
+情景注入(inject_scenario) → 
+  ↓
+ScenarioManager.update_scenario → 
+  ↓
+LangGraph工作流(scenario_workflow) →
+  ↓
+记忆闪回节点(memory_flashback_node) + 情景更新节点(scenario_updater_node) →
+  ↓
+文件系统(scenarios/*.txt) →
+  ↓
+目标LLM API调用 → 响应返回
+```
+
+### 关键组件交互
+- **ProxyService**: 处理HTTP代理，协调工作流调用
+- **ScenarioManager**: 管理情景生命周期，提供同步和流式接口
+- **LangGraph工作流**: 使用StateGraph管理复杂的多Agent执行流程
+- **工具系统**: 提供文件操作、搜索、思考等原子能力
+- **流式转换**: WorkflowStreamConverter将工作流事件转换为SSE格式
+
+### Agent配置要点
+- 记忆闪回Agent使用Wikipedia工具搜索外部知识
+- 情景更新Agent使用文件操作工具管理scenario文件
+- 两个Agent共享sequential_thinking工具进行推理
+- debug模式可输出详细的Agent执行信息
+
+## 重要机制说明
+
+### 端口自动递增机制
+系统启动时会自动检测配置端口是否被占用：
+- 从config.yaml中的端口开始检测
+- 如被占用则自动+1，最多尝试20个端口
+- 最终使用的端口会在终端输出中显示
+- 避免手动解决端口冲突问题
+
+### 角色切换和缓存清理
+- 用户发送"deeproleplay"消息可清除历史缓存
+- 重新开始新的角色扮演会话
+- 避免不同角色间的情景混淆
+
+### 配置文件热重载
+- 支持在运行时修改config.yaml
+- 部分配置项需要重启服务生效
+- 建议使用uvicorn的--reload选项进行开发调试
+
+## 工作流模式对比
+
+### Fast模式 (workflow_type: "fast")
+- **文件**: `src/workflow/graph/fast_scenario_workflow.py`
+- **结构**: 2次LLM调用优化流程，记忆搜索 + 情景编辑
+- **优势**: 响应速度快，资源消耗低
+- **适用**: 一般角色扮演场景，对响应速度要求高
+
+### Pro模式 (workflow_type: "pro")  
+- **文件**: `src/workflow/graph/scenario_workflow.py`
+- **结构**: 完整多Agent架构，记忆闪回Agent + 情景更新Agent
+- **优势**: 功能完整，角色记忆更准确，支持复杂情景
+- **适用**: 复杂角色扮演，长期对话，需要精确角色记忆
+
+### Forward模式 (only_forward: true)
+- **文件**: `src/workflow/graph/forward_workflow.py`
+- **结构**: 直接转发模式，跳过Agent处理
+- **优势**: 最快响应，零额外开销
+- **适用**: 测试环境或不需要角色记忆的场景
