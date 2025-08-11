@@ -1,0 +1,84 @@
+
+# ====================================================================
+# DeepRolePlay 配置文件 - 初学者指南
+# ====================================================================
+# 
+# 🤔 什么是"转发LLM"和"Agent LLM"？
+# 
+# 【转发LLM】= 你实际想要聊天的AI模型
+# • 这是最终与用户聊天的AI，比如DeepSeek、Claude、GPT等
+# • 你在SillyTavern中填入的API密钥就是这个模型的
+# • 配置位置：下方proxy部分
+# 
+# 【Agent LLM】= 幕后智能助手AI模型  
+# • 负责"记忆闪回"和"情景更新"，用户看不到它的回复
+# • 推荐使用Gemini 2.5 Flash（响应速度快）
+# • 配置位置：下方agent部分
+# 
+# 💡 举例：
+# - 转发LLM：DeepSeek（便宜，与用户聊天）→ 在proxy部分填入base_url，在前端填入api_key等配置。前端应填入base_url为http://localhost:6666/api/v1
+# - Agent LLM：Gemini 2.5 Flash（后台工作）→ 在agent部分填入
+# - 你需要两个不同的API密钥！
+# 
+# 🔗 数据流：用户 → DeepRolePlay → Agent LLM处理记忆 → 转发LLM生成回复
+# ====================================================================
+
+# 【API代理配置】转发到目标LLM服务
+proxy:
+  # 最终LLM服务地址 | 控制请求转发目标 | 需要修改：填入你的LLM服务API地址
+  target_url: "https://api.deepseek.com/v1"
+  # HTTP请求超时（秒）| 控制请求等待时间 | 通常无需修改：30秒足够
+  timeout: 30
+  # 调试模式开关 | 控制是否跳过工作流直接返回测试消息 | 通常无需修改：正常运行时为false
+  debug_mode: false
+  # 保存完整消息开关 | 控制是否保存完整的请求消息 | 通常无需修改：false节省tokens，true用于调试
+  save_full_messages: false
+
+# 【情景文件配置】角色状态存储
+scenario:
+  # 情景文件存储路径 | 控制角色状态保存位置 | 通常无需修改：自动创建目录
+  file_path: "./scenarios/scenario.json"
+  # 表格输出格式 | 控制表格数据输出格式 | 可调整："table"为格式化文本，"json"为JSON字符串
+  output_format: "json"
+
+# 【工作流控制配置】Agent执行参数
+langgraph:
+  # 传递给目标LLM的历史消息数量 | 控制上下文长度和token消耗 | 可调整：3-15条消息，影响记忆效果和成本
+  max_history_length: 7
+  # 最后AI消息索引 | 根据你预设不同选择使用哪条AI消息作为真实回复 | 通常无需修改：1表示最后一条AI消息
+  last_ai_messages_index: 1
+  # 快速转发模式 | 控制是否跳过Agent直接转发 | 通常无需修改：正常运行时为false
+  only_forward: false
+  # 工作流前端流式开关 | 控制是否将agent推理过程推送到前端 | 可调整：true显示推理过程，false只显示最终对话
+  stream_workflow_to_frontend: true
+
+# 【Agent配置】用于记忆闪回和情景更新的AI模型
+agent:
+  # AI模型名称 | 控制使用哪个AI模型 | 使用Qwen3作为agent模型
+  model: "qwen/qwen3-235b-a22b-2507"
+  # 生成随机性（0-1）| 控制回答创造性 | 可调整：0.1稳定，0.7有创意，影响一致性
+  temperature: 0
+  # API服务提供商地址 | 控制模型调用接口 | 使用OpenRouter API
+  base_url: "https://openrouter.ai/api/v1"
+  # API访问密钥 | 控制服务认证 | 需要修改：填入你的OpenRouter API密钥
+  api_key: "Your-OpenRouter-API-Key"
+  # 最大输出tokens | 控制单次生成长度限制 | 通常无需修改：8192足够应对大多数情景
+  max_tokens: 8192
+  # 采样概率阈值（0-1）| 控制词汇选择范围 | 通常无需修改：0.9确保多样性
+  top_p: 0.9
+  # Agent调试信息 | 控制是否显示详细执行过程 | 调试时修改：true显示过程，false正常运行
+  debug: false
+  # 最大执行轮数 | 控制上限防止无限循环 | 通常无需修改：40轮足够应对复杂任务
+  max_iterations: 40
+  # 单次请求超时（秒）| 控制Agent调用等待时间 | 可调整：网络慢时可增加到180
+  timeout: 120
+
+
+# 【服务器配置】DeepRolePlay服务网络设置
+server:
+  # 监听IP地址 | 控制外部访问权限 | 通常无需修改：0.0.0.0允许局域网访问
+  host: "0.0.0.0"
+  # 服务端口号 | 控制前端连接端口 | 可调整：如被占用会自动+1，前端需相应修改
+  port: 6666
+  # 代码热重载 | 控制开发时自动重启 | 通常无需修改：生产环境false避免意外重启
+  reload: false
