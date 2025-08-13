@@ -1,0 +1,14 @@
+.prompt/
+.venv/
+logs/
+tests/
+scenarios/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+.claude
+*.spec
+dist/
+build/
