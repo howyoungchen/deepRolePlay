@@ -1,0 +1,59 @@
+
+# ====================================================================
+# DeepRolePlay 配置文件
+# 如需查阅配置项的详细含义和说明，请查看：config/config_details_cn.txt
+# 
+# DeepRolePlay Configuration File  
+# For detailed descriptions and explanations of configuration items, please refer to: config/config_details_en.txt
+# ====================================================================
+
+proxy:
+  target_url: "https://api.deepseek.com/v1"
+  api_key: "Your-API-Key-Here"
+  provider: ""
+  timeout: 30
+  debug_mode: false
+  save_full_messages: false
+
+scenario:
+  file_path: "./scenarios/scenario.json"
+  output_format: "json"
+
+langgraph:
+  max_history_length: 7
+  last_ai_messages_index: -1
+  ai_message_min_length: 300
+  only_forward: false
+  stream_workflow_to_frontend: true
+
+agent:
+  model: "deepseek-chat"
+  temperature: 1
+  base_url: "https://api.deepseek.com/v1"
+  api_key: "Your-DeepSeek-API-Key-Here"
+  provider: ""
+  max_tokens: 8192
+  top_p: 0.9
+  debug: false
+  max_iterations: 40
+  timeout: 120
+
+
+server:
+  host: "0.0.0.0"
+  port: 6666
+  reload: false
+
+comfyui:
+  enabled: false
+  ip: "Your-ComfyUI-IP-Here"
+  port: 8188
+  api_key: "Your-ComfyUI-API-Key-Here"
+  workflow_path: "3rd/comfyui/wai.json"
+  positive_prompt_node_id: "6"
+  latent_image_node_id: "5"
+  width: 960
+  height: 1024
+  num_images: 3
+  positive_prefix: "masterpiece,best quality,amazing quality,"
+  max_display_size: 240
