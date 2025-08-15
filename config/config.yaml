@@ -1,0 +1,53 @@
+
+
+proxy:
+  target_url: "https://api.deepseek.com/v1"
+  api_key: "YOUR_TARGET_API_KEY_HERE"
+  provider: ""
+  timeout: 30
+  debug_mode: false
+  save_full_messages: true
+
+scenario:
+  file_path: "./scenarios/scenario.json"
+  output_format: "json"
+  clear_strategy: "auto"
+  similarity_threshold: 0.9
+
+langgraph:
+  max_history_length: 7
+  last_ai_messages_index: -1
+  ai_message_min_length: 300
+  only_forward: false
+  stream_workflow_to_frontend: true
+
+agent:
+  model: "qwen/qwen3-235b-a22b-2507"
+  temperature: 0
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "YOUR_AGENT_API_KEY_HERE"
+  provider: "novita/fp8"
+  max_tokens: 8192
+  top_p: 0.9
+  debug: false
+  max_iterations: 40
+  timeout: 120
+
+
+server:
+  host: "0.0.0.0"
+  port: 6666
+  reload: false
+
+comfyui:
+  enabled: false
+  comfy_url: "http://YOUR_COMFYUI_IP:8188"
+  api_key: "YOUR_COMFYUI_API_KEY_HERE"
+  workflow_path: "3rd/comfyui/wai.json"
+  positive_prompt_node_id: "6"
+  latent_image_node_id: "5"
+  width: 960
+  height: 1024
+  num_images: 3
+  positive_prefix: "masterpiece,best quality,amazing quality,"
+  max_display_size: 480

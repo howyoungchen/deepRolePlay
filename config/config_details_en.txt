@@ -1,0 +1,228 @@
+# ====================================================================
+# DeepRolePlay Configuration File - Detailed Guide for Beginners
+# ====================================================================
+
+## 🤔 What are "Forward LLM" and "Agent LLM"?
+
+【Forward LLM】= The AI model you actually want to chat with
+• This is the AI that ultimately chats with users, such as DeepSeek, Claude, GPT, etc.
+• The API key you fill in SillyTavern is for this model
+• Configuration location: proxy section below
+
+【Agent LLM】= Background intelligent assistant AI model
+• Responsible for "memory flashback" and "scenario updates", users don't see its responses
+• Recommended to use Gemini 2.5 Flash (fast response)
+• Configuration location: agent section below
+
+💡 Example:
+- Forward LLM: DeepSeek (cheap, chat with users) → Fill in base_url in proxy section, fill in api_key etc. in frontend. Frontend should use base_url as http://localhost:6666/api/v1
+- Agent LLM: Gemini 2.5 Flash (background work) → Fill in agent section
+- You need two different API keys!
+
+🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forward LLM generates response
+
+# ====================================================================
+# Configuration Item Detailed Description
+# ====================================================================
+
+## 【API Proxy Configuration】Forward to target LLM service
+
+### target_url
+- Description: Final LLM service address
+- Function: Controls request forwarding target
+- Modification suggestion: Needs modification, fill in your LLM service API address
+
+### api_key
+- Description: API key
+- Function: API key forwarded to target LLM service
+- Modification suggestion: Needs modification, fill in your target service API key, will override the key in request header
+
+### provider
+- Description: Service provider
+- Function: Optional, specify specific provider for aggregation services like OpenRouter
+- Example: "novita/fp8", "deepinfra/fp8"
+
+### timeout
+- Description: HTTP request timeout (seconds)
+- Function: Controls request waiting time
+- Modification suggestion: Usually no need to modify, 30 seconds is sufficient
+
+### debug_mode
+- Description: Debug mode switch
+- Function: Controls whether to skip workflow and directly return test message
+- Modification suggestion: Usually no need to modify, should be false during normal operation
+
+### save_full_messages
+- Description: Save full messages switch
+- Function: Controls whether to save complete request messages
+- Modification suggestion: Usually no need to modify, false saves tokens, true for debugging
+
+## 【Scenario File Configuration】Character state storage
+
+### file_path
+- Description: Scenario file storage path
+- Function: Controls character state save location
+- Modification suggestion: Usually no need to modify, automatically creates directory
+
+### output_format
+- Description: Table output format
+- Function: Controls table data output format
+- Modification suggestion: Adjustable, "table" for formatted text, "json" for JSON string
+
+### clear_strategy
+- Description: Duplicate message clearing strategy
+- Function: Controls when to clear duplicate messages
+- Options: "auto" (automatic detection), "always" (always clear), "manual" (manual clearing)
+- Modification suggestion: Usually use "auto", automatically clears when similar messages are detected
+
+### similarity_threshold
+- Description: Message similarity threshold
+- Function: Determines when messages are considered duplicates for clearing
+- Range: 0.0-1.0 (0.9 means 90% similarity)
+- Modification suggestion: Usually no need to modify, 0.9 is reasonable for most scenarios
+
+## 【Workflow Control Configuration】Agent execution parameters
+
+### max_history_length
+- Description: Number of historical messages passed to target LLM
+- Function: Controls context length and token consumption
+- Modification suggestion: Adjustable, 3-15 messages, affects memory effectiveness and cost
+
+### last_ai_messages_index
+- Description: Last AI message index
+- Function: Choose which AI message to use as real response based on your preset
+- Modification suggestion: Usually no need to modify, 1 means last AI message, -1 means auto-find the reverse index of first AI message with content length > ai_message_min_length
+
+### ai_message_min_length
+- Description: AI message minimum length threshold
+- Function: Used for auto-finding AI messages when last_ai_messages_index=-1
+- Modification suggestion: Adjustable, 50-200, affects auto-finding accuracy
+
+### only_forward
+- Description: Fast forward mode
+- Function: Controls whether to skip Agent and forward directly
+- Modification suggestion: Usually no need to modify, should be false during normal operation
+
+### stream_workflow_to_frontend
+- Description: Workflow frontend streaming switch
+- Function: Controls whether to push agent reasoning process to frontend
+- Modification suggestion: Adjustable, true shows reasoning process, false only shows final dialogue
+
+## 【Agent Configuration】AI model for memory flashback and scenario updates
+
+### model
+- Description: AI model name
+- Function: Controls which AI model to use
+- Modification suggestion: Use Qwen3 as agent model
+
+### temperature
+- Description: Generation randomness (0-1)
+- Function: Controls answer creativity
+- Modification suggestion: Adjustable, 0.1 stable, 0.7 creative, affects consistency
+
+### base_url
+- Description: API service provider address
+- Function: Controls model call interface
+- Modification suggestion: Use OpenRouter API
+
+### api_key
+- Description: API access key
+- Function: Controls service authentication
+- Modification suggestion: Needs modification, fill in your OpenRouter API key
+
+### provider
+- Description: Service provider
+- Function: Optional, specify specific provider for aggregation services like OpenRouter
+- Example: "novita/fp8", "deepinfra/fp8"
+
+### max_tokens
+- Description: Maximum output tokens
+- Function: Controls single generation length limit
+- Modification suggestion: Usually no need to modify, 8192 is sufficient for most scenarios
+
+### top_p
+- Description: Sampling probability threshold (0-1)
+- Function: Controls vocabulary selection range
+- Modification suggestion: Usually no need to modify, 0.9 ensures diversity
+
+### debug
+- Description: Agent debug information
+- Function: Controls whether to show detailed execution process
+- Modification suggestion: Modify when debugging, true shows process, false for normal operation
+
+### max_iterations
+- Description: Maximum execution rounds
+- Function: Controls upper limit to prevent infinite loops
+- Modification suggestion: Usually no need to modify, 40 rounds sufficient for complex tasks
+
+### timeout
+- Description: Single request timeout (seconds)
+- Function: Controls Agent call waiting time
+- Modification suggestion: Adjustable, can increase to 180 when network is slow
+
+## 【Server Configuration】DeepRolePlay service network settings
+
+### host
+- Description: Listen IP address
+- Function: Controls external access permissions
+- Modification suggestion: Usually no need to modify, 0.0.0.0 allows LAN access
+
+### port
+- Description: Service port number
+- Function: Controls frontend connection port
+- Modification suggestion: Adjustable, will auto +1 if occupied, frontend needs corresponding modification
+
+### reload
+- Description: Code hot reload
+- Function: Controls automatic restart during development
+- Modification suggestion: Usually no need to modify, false in production to avoid accidental restarts
+
+## 【ComfyUI Configuration】Image generation service
+
+### enabled
+- Description: Enable switch
+- Function: Controls whether image generation function is enabled
+
+### ip
+- Description: ComfyUI server IP address
+- Function: Connect to ComfyUI service
+
+### port
+- Description: ComfyUI server port
+- Function: Specify ComfyUI service port
+
+### api_key
+- Description: ComfyUI API key
+- Function: ComfyUI service authentication
+
+### workflow_path
+- Description: ComfyUI workflow file path
+- Function: Specify image generation workflow configuration
+
+### positive_prompt_node_id
+- Description: Positive prompt node ID
+- Function: ID of positive prompt node in ComfyUI workflow
+
+### latent_image_node_id
+- Description: Latent image node ID
+- Function: ID of image generation node in ComfyUI workflow
+
+### width
+- Description: Generated image width
+- Function: Controls output image pixel width
+
+### height
+- Description: Generated image height
+- Function: Controls output image pixel height
+
+### num_images
+- Description: Number of images generated per request
+- Function: Controls number of images generated in single request
+
+### positive_prefix
+- Description: Positive prompt prefix
+- Function: Fixed prefix automatically added before all image generation prompts
+
+### max_display_size
+- Description: Maximum edge length of frontend displayed images (pixels)
+- Function: Controls image size transmitted to SillyTavern, affects transmission speed and display effect
