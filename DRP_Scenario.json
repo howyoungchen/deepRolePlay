@@ -1,0 +1,17 @@
+{
+    "id": "3bdd33e0-6904-4f7a-aecd-b97ada17c462",
+    "scriptName": "DRP_Scenario",
+    "findRegex": "<deepRolePlay(?:\\s[^>]*)?>([\\s\\S]*?)</deepRolePlay>",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        2
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": true,
+    "runOnEdit": false,
+    "substituteRegex": 0,
+    "minDepth": null,
+    "maxDepth": null
+}
