@@ -1,0 +1,18 @@
+services:
+  deep-roleplay:
+    image: deep-roleplay
+    build: .
+    container_name: deep-roleplay
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=UTF-8
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+    volumes:
+      - ./config:/app/config:rw
+      - ./logs:/app/logs:rw
+      - ./scenarios:/app/scenarios:rw
+    ports:
+      - "6666:6666"
+    user: root
