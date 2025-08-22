@@ -1,0 +1,18 @@
+{
+    "id": "b35023e1-4330-445e-a339-88e38af8fbee",
+    "scriptName": "DRP_IMG",
+    "findRegex": "/!\\[[^\\]]*\\]\\(\\s*(?:[^()\\\\]|\\\\.|(?:\\((?:[^()\\\\]|\\\\.)*\\)))*\\s*\\)/gs",
+    "replaceString": "",
+    "trimStrings": [],
+    "placement": [
+        1,
+        2
+    ],
+    "disabled": false,
+    "markdownOnly": false,
+    "promptOnly": true,
+    "runOnEdit": false,
+    "substituteRegex": 0,
+    "minDepth": null,
+    "maxDepth": null
+}
