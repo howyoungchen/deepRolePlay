@@ -1,0 +1,62 @@
+
+
+proxy:
+  target_url: "Your-LLM-Base-URL"
+  api_key: "Your-LLM-API-KEY"
+  provider: ""
+  timeout: 30
+  debug_mode: false
+  allow_extra_params: false
+
+scenario:
+  file_path: "./scenarios/scenario.json"
+  output_format: "txt"
+  clear_strategy: "auto"
+  similarity_threshold: 0.9
+
+langgraph:
+  max_history_length: 7
+  last_ai_messages_index: -1
+  ai_message_min_length: 200
+  only_forward: false
+  stream_workflow_to_frontend: true
+
+agent:
+  model: "Qwen/Qwen3-235B-A22B-Instruct-2507"
+  temperature: 0
+  base_url: "Your-Agent-Base-URL" 
+  api_key: "Your-Agent-API-KEY"
+  provider: ""
+  max_tokens: 8192
+  top_p: 0.9
+  debug: false
+  max_iterations: 40
+  stream_mode: true
+  workflow_mode: "fast"
+  timeout: 120
+  enable_wiki_search: false 
+
+
+server:
+  host: "0.0.0.0"
+  port: 6666
+  reload: false
+
+comfyui:
+  enabled: false
+  comfy_url: "http://<Your-Comfyui-IP>:8188"
+  api_key: "Your-ComfyUI-API-KEY"
+  workflow_path: "./wai.json"
+  positive_prompt_node_id: "6"
+  latent_image_node_id: "5"
+  width: 960
+  height: 1024
+  num_images: 3
+  positive_prefix: "masterpiece,best quality,amazing quality,"
+  max_display_size: 480
+
+log:
+  base_log_path: "./logs"
+  enable_agent_history: true
+  history_format: "txt"
+  save_request_origin_messages: true
