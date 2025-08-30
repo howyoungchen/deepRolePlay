@@ -1,0 +1,480 @@
+# ====================================================================
+# DeepRolePlay Configuration File - Detailed Guide for Beginners
+# ====================================================================
+
+## 🤔 What are "Forward LLM" and "Agent LLM"?
+
+【Forward LLM】= The AI model you actually want to chat with
+• This is the AI that ultimately chats with users, such as DeepSeek, Claude, GPT, etc.
+• The API key you fill in SillyTavern is for this model
+• Configuration location: proxy section below
+
+【Agent LLM】= Background intelligent assistant AI model
+• Responsible for "memory flashback" and "scenario updates", users don't see its responses
+• Recommended to use Gemini 2.5 Flash (fast response)
+• Configuration location: agent section below
+
+💡 Example:
+- Forward LLM: DeepSeek (cheap, chat with users) → Fill in target_url in proxy section, fill in api_key etc. in frontend. Frontend should use base_url as http://localhost:6666/v1
+- Agent LLM: Gemini 2.5 Flash (background work) → Fill in agent section
+- You need two different API keys!
+
+🔗 Data flow: User → DeepRolePlay → Agent LLM processes memory → Forward LLM generates response
+
+# ====================================================================
+# Configuration Item Detailed Description
+# ====================================================================
+
+## 【proxy - API Proxy Configuration】Forward to target LLM service
+
+### target_url
+- Description: Final LLM service address
+- Function: Controls request forwarding target
+- Modification suggestion: Needs modification, fill in your LLM service API address
+- Default value: "https://api.deepseek.com/v1"
+
+### api_key
+- Description: API key
+- Function: API key forwarded to target LLM service
+- Modification suggestion: Needs modification, fill in your target service API key, will override the key in request header
+- Default value: "Your-LLM-API-Key"
+
+### provider
+- Description: Service provider
+- Function: Optional, specify specific provider for aggregation services like OpenRouter
+- Example: "novita/fp8", "deepinfra/fp8"
+- Default value: "" (empty string)
+
+### timeout
+- Description: HTTP request timeout (seconds)
+- Function: Controls request waiting time
+- Modification suggestion: Usually no need to modify, 30 seconds is sufficient
+- Default value: 30
+
+### debug_mode
+- Description: Debug mode switch
+- Function: Controls whether to skip workflow and directly return test message
+- Modification suggestion: Usually no need to modify, should be false during normal operation
+- Default value: false
+
+### allow_extra_params
+- Description: Allow extra parameters
+- Function: Controls whether to allow forwarding extra request parameters
+- Modification suggestion: Usually no need to modify
+- Default value: false
+
+## 【scenario - Scenario File Configuration】Character state storage
+
+### file_path
+- Description: Scenario file storage path
+- Function: Controls character state save location
+- Modification suggestion: Usually no need to modify, automatically creates directory
+- Default value: "./scenarios/scenario.json"
+
+### output_format
+- Description: Table output format
+- Function: Controls table data output format
+- Options: "json" (JSON string), "table" (formatted text)
+- Modification suggestion: Recommend using "json"
+- Default value: "json"
+
+### clear_strategy
+- Description: Duplicate message clearing strategy
+- Function: Controls when to clear duplicate messages
+- Options: "auto" (automatic detection), "always" (always clear), "manual" (manual clearing)
+- Modification suggestion: Recommend "auto", automatically clears when similar messages are detected
+- Default value: "always"
+
+### similarity_threshold
+- Description: Message similarity threshold
+- Function: Determines when messages are considered duplicates for clearing
+- Range: 0.0-1.0 (0.9 means 90% similarity)
+- Modification suggestion: Usually no need to modify, 0.9 is reasonable for most scenarios
+- Default value: 0.9
+
+## 【langgraph - Workflow Control Configuration】Agent execution parameters
+
+### max_history_length
+- Description: Number of historical messages passed to target LLM
+- Function: Controls context length and token consumption
+- Modification suggestion: Adjustable, 3-15 messages, affects memory effectiveness and cost
+- Default value: 7
+
+### last_ai_messages_index
+- Description: Last AI message index
+- Function: Choose which AI message to use as real response based on your preset
+- Modification suggestion: Usually no need to modify, 1 means last AI message, -1 means auto-find the reverse index of first AI message with content length > ai_message_min_length
+- Default value: -1
+
+### ai_message_min_length
+- Description: AI message minimum length threshold
+- Function: Used for auto-finding AI messages when last_ai_messages_index=-1
+- Modification suggestion: Adjustable, 50-200, affects auto-finding accuracy
+- Default value: 200
+
+### only_forward
+- Description: Fast forward mode
+- Function: Controls whether to skip Agent and forward directly
+- Modification suggestion: Usually no need to modify, should be false during normal operation
+- Default value: false
+
+### stream_workflow_to_frontend
+- Description: Workflow frontend streaming switch
+- Function: Controls whether to push agent reasoning process to frontend
+- Modification suggestion: Adjustable, true shows reasoning process, false only shows final dialogue
+- Default value: true
+
+## 【agent - Agent Configuration】AI model for memory flashback and scenario updates
+
+### model
+- Description: AI model name
+- Function: Controls which AI model to use
+- Modification suggestion: Use high-performance models like Qwen, Claude, Gemini, etc.
+- Default value: "Qwen/Qwen3-235B-A22B-Instruct-2507"
+
+### temperature
+- Description: Generation randomness (0-1)
+- Function: Controls answer creativity
+- Modification suggestion: Adjustable, 0 stable (recommended), 0.1-0.3 slight randomness, 0.7 creative
+- Default value: 0
+
+### base_url
+- Description: API service provider address
+- Function: Controls model call interface
+- Modification suggestion: Fill in your API service provider address
+- Default value: "https://llm.chutes.ai/v1"
+
+### api_key
+- Description: API access key
+- Function: Controls service authentication
+- Modification suggestion: Needs modification, fill in your API key
+- Default value: "Your-Agent-API-Key"
+
+### provider
+- Description: Service provider
+- Function: Optional, specify specific provider for aggregation services like OpenRouter
+- Example: "novita/fp8", "deepinfra/fp8"
+- Default value: "" (empty string)
+
+### max_tokens
+- Description: Maximum output tokens
+- Function: Controls single generation length limit
+- Modification suggestion: Usually no need to modify, 8192 is sufficient for most scenarios
+- Default value: 8192
+
+### top_p
+- Description: Sampling probability threshold (0-1)
+- Function: Controls vocabulary selection range
+- Modification suggestion: Usually no need to modify, 0.9 ensures diversity
+- Default value: 0.9
+
+### debug
+- Description: Agent debug information
+- Function: Controls whether to show detailed execution process
+- Modification suggestion: Modify when debugging, true shows process, false for normal operation
+- Default value: false
+
+### max_iterations
+- Description: Maximum execution rounds
+- Function: Controls upper limit to prevent infinite loops
+- Modification suggestion: Usually no need to modify, 40 rounds sufficient for complex tasks
+- Default value: 40
+
+### stream_mode
+- Description: Agent workflow streaming mode
+- Function: Controls whether Agent execution uses true streaming
+- Modification suggestion: Usually no need to modify, true for true streaming (astream), false for pseudo streaming (ainvoke)
+- Default value: true
+
+### workflow_mode
+- Description: Workflow execution mode
+- Function: Controls which workflow configuration to use
+- Options: "fast" (economical fast mode), "drp" (high performance mode)
+- Modification suggestion: Recommend "fast" for better cost control
+- Default value: "fast"
+
+### timeout
+- Description: Single request timeout (seconds)
+- Function: Controls Agent call waiting time
+- Modification suggestion: Adjustable, can increase to 180 when network is slow
+- Default value: 120
+
+### enable_wiki_search
+- Description: Enable Wikipedia search
+- Function: Controls whether to use Wikipedia tool during memory flashback
+- Modification suggestion: Usually no need to modify, false saves cost and time
+- Default value: false
+
+### external_knowledge_path
+- Description: External knowledge base path
+- Function: Specify additional knowledge base file path
+- Modification suggestion: Configure if you have custom knowledge base
+- Default value: "" (empty string)
+
+## 【server - Server Configuration】DeepRolePlay service network settings
+
+### host
+- Description: Listen IP address
+- Function: Controls external access permissions
+- Modification suggestion: Usually no need to modify, 0.0.0.0 allows LAN access, 127.0.0.1 for localhost only
+- Default value: "0.0.0.0"
+
+### port
+- Description: Service port number
+- Function: Controls frontend connection port
+- Modification suggestion: Adjustable, will auto +1 if occupied, frontend needs corresponding modification
+- Default value: 6666
+
+### reload
+- Description: Code hot reload
+- Function: Controls automatic restart during development
+- Modification suggestion: Can set to true during development, false in production to avoid accidental restarts
+- Default value: false
+
+## 【comfyui - ComfyUI Configuration】Image generation service
+
+### enabled
+- Description: Function enable switch
+- Function: Controls whether image generation function is enabled
+- Modification suggestion: Set to true when image generation is needed
+- Default value: false
+
+### comfy_url
+- Description: ComfyUI server complete URL
+- Function: Connect to ComfyUI service
+- Modification suggestion: Fill in your ComfyUI server address
+- Default value: "http://<Your-Comfyui-IP>:8188"
+
+### api_key
+- Description: ComfyUI API key
+- Function: ComfyUI service authentication
+- Modification suggestion: Fill in if ComfyUI requires authentication
+- Default value: "Your-Comfyu-Api-Key"
+
+### workflow_path
+- Description: ComfyUI workflow file path
+- Function: Specify image generation workflow configuration
+- Modification suggestion: Can customize workflow JSON file
+- Default value: "3rd/comfyui/wai.json"
+
+### positive_prompt_node_id
+- Description: Positive prompt node ID
+- Function: ID of positive prompt node in ComfyUI workflow
+- Modification suggestion: Adjust according to workflow file
+- Default value: "6"
+
+### latent_image_node_id
+- Description: Latent image node ID
+- Function: ID of image generation node in ComfyUI workflow
+- Modification suggestion: Adjust according to workflow file
+- Default value: "5"
+
+### width
+- Description: Generated image width
+- Function: Controls output image pixel width
+- Modification suggestion: Adjust according to needs, affects generation time and quality
+- Default value: 960
+
+### height
+- Description: Generated image height
+- Function: Controls output image pixel height
+- Modification suggestion: Adjust according to needs, affects generation time and quality
+- Default value: 1024
+
+### num_images
+- Description: Number of images generated per request
+- Function: Controls number of images generated in single request
+- Modification suggestion: Adjustable, more images take longer to generate
+- Default value: 3
+
+### positive_prefix
+- Description: Positive prompt prefix
+- Function: Fixed prefix automatically added before all image generation prompts
+- Modification suggestion: Can customize art style and quality keywords
+- Default value: "masterpiece,best quality,amazing quality,"
+
+### max_display_size
+- Description: Maximum edge length of frontend displayed images (pixels)
+- Function: Controls image size transmitted to SillyTavern, affects transmission speed and display effect
+- Modification suggestion: Adjust according to network conditions, smaller values transfer faster
+- Default value: 480
+
+## 【log - Log Configuration】System log management
+
+### base_log_path
+- Description: Log file base path
+- Function: Controls log file storage location
+- Modification suggestion: Usually no need to modify, ensure path exists
+- Default value: "./logs"
+
+### enable_agent_history
+- Description: Enable Agent history recording
+- Function: Controls whether to save Agent execution history
+- Modification suggestion: Can enable during debugging, disable in production to save space
+- Default value: true
+
+### history_format
+- Description: History record format
+- Function: Controls Agent history save format
+- Options: "txt" (text format), "json" (JSON format)
+- Modification suggestion: Recommend "txt" for easy viewing
+- Default value: "txt"
+
+### save_request_origin_messages
+- Description: Save original request messages
+- Function: Controls whether to save unprocessed original request messages
+- Modification suggestion: Enable during debugging, can disable in production
+- Default value: true
+
+# ====================================================================
+# Common Configuration Scenarios
+# ====================================================================
+
+## 💰 Economical Mode Configuration (Recommended)
+```yaml
+proxy:
+  target_url: "https://api.deepseek.com/v1"  # Cheap dialogue model
+  api_key: "Your-DeepSeek-API-Key"
+
+agent:
+  model: "google/gemini-2.0-flash-exp"       # Fast Agent model
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "Your-OpenRouter-API-Key"
+  workflow_mode: "fast"                       # Economical mode
+
+langgraph:
+  max_history_length: 5                       # Reduce token consumption
+  stream_workflow_to_frontend: false          # Hide reasoning process
+```
+
+## 🚀 High Performance Mode Configuration
+```yaml
+proxy:
+  target_url: "https://api.openai.com/v1"     # High-quality dialogue model
+  api_key: "Your-OpenAI-API-Key"
+
+agent:
+  model: "anthropic/claude-3.5-sonnet"       # High-performance Agent model
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "Your-OpenRouter-API-Key"
+  workflow_mode: "drp"                        # High performance mode
+
+langgraph:
+  max_history_length: 15                      # More context
+  stream_workflow_to_frontend: true           # Show reasoning process
+```
+
+## 🖼️ Image Generation Mode Configuration
+```yaml
+comfyui:
+  enabled: true
+  comfy_url: "http://127.0.0.1:8188"
+  workflow_path: "3rd/comfyui/anime_workflow.json"  # Custom workflow
+  num_images: 1                                       # Single image generation is faster
+  width: 768
+  height: 768
+```
+
+# ====================================================================
+# Troubleshooting Guide
+# ====================================================================
+
+## 🔧 Common Issues and Solutions
+
+### 1. Port Already in Use
+**Symptom**: Startup shows port already in use
+**Solution**: System will automatically increment port to find available one, check actual port number in terminal output
+
+### 2. API Key Error
+**Symptom**: 401 authentication error
+**Solution**: Check if proxy.api_key and agent.api_key are correctly filled
+
+### 3. Workflow Execution Timeout
+**Symptom**: Request hangs for long time with no response
+**Solution**:
+- Increase agent.timeout value
+- Check if Agent model's base_url is accessible
+- Consider switching to faster Agent model
+
+### 4. Image Generation Failure
+**Symptom**: ComfyUI related errors
+**Solution**:
+- Check if comfyui.comfy_url is correct
+- Confirm ComfyUI service is running normally
+- Verify the file pointed to by workflow_path exists
+
+### 5. Frontend Connection Failure
+**Symptom**: SillyTavern cannot connect
+**Solution**:
+- Confirm DeepRolePlay service is running normally
+- Check if frontend base_url is filled as http://localhost:port_number/v1
+- Confirm port number matches actual running port
+
+### 6. Poor Memory Performance
+**Symptom**: Character forgetting or inaccurate memory
+**Solution**:
+- Increase langgraph.max_history_length
+- Decrease scenario.similarity_threshold
+- Consider upgrading Agent model performance
+
+# ====================================================================
+# Advanced Configuration Tips
+# ====================================================================
+
+## 🎯 Performance Optimization
+
+### Token Usage Optimization
+- Reduce `max_history_length` to save tokens
+- Use `clear_strategy: "auto"` to automatically clean duplicate scenarios
+- Set `stream_workflow_to_frontend: false` to hide internal processing
+
+### Response Speed Optimization
+- Use faster Agent models (Gemini Flash, Claude Haiku)
+- Reduce `agent.timeout` for faster failure detection
+- Set `enable_wiki_search: false` to skip external searches
+
+### Memory Accuracy Optimization
+- Increase `max_history_length` for more context
+- Lower `similarity_threshold` for stricter duplicate detection
+- Use high-quality Agent models (Claude Sonnet, GPT-4)
+
+## 🔒 Security Considerations
+
+### API Key Management
+- Never commit real API keys to version control
+- Use environment variables for sensitive keys
+- Regularly rotate API keys
+
+### Network Security
+- Use `host: "127.0.0.1"` for localhost-only access
+- Configure firewall rules for production deployment
+- Use HTTPS for external API endpoints
+
+## 📊 Monitoring and Debugging
+
+### Enable Debug Mode
+```yaml
+agent:
+  debug: true                    # Show detailed execution process
+
+log:
+  enable_agent_history: true     # Save Agent execution history
+  history_format: "json"        # Use JSON format for structured logs
+```
+
+### Log Analysis
+- Check `logs/workflow/` directory for execution logs
+- Monitor token usage in debug output
+- Track response times for performance optimization
+
+## 🔄 Migration and Backup
+
+### Configuration Backup
+- Backup `config/config.yaml` before major changes
+- Document custom configurations for team sharing
+- Version control configuration changes
+
+### Data Migration
+- Backup `scenarios/` directory before system updates
+- Export table data using `$show` command
+- Test configuration changes in development environment first
