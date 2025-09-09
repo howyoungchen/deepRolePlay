@@ -1,0 +1,418 @@
+# ====================================================================
+# DeepRolePlay 配置文件详细说明 - 初学者指南
+# ====================================================================
+
+## 🤔 什么是"转发LLM"和"Agent LLM"？
+
+【转发LLM】= 你实际想要聊天的AI模型
+• 这是最终与用户聊天的AI，比如DeepSeek、Claude、GPT等
+• 你在SillyTavern中填入的API密钥就是这个模型的
+• 配置位置：下方proxy部分
+
+【Agent LLM】= 幕后智能助手AI模型  
+• 负责"记忆闪回"和"情景更新"，用户看不到它的回复
+• 推荐使用Gemini 2.5 Flash（响应速度快）
+• 配置位置：下方agent部分
+
+💡 举例：
+- 转发LLM：DeepSeek（便宜，与用户聊天）→ 在proxy部分填入target_url，在前端填入api_key等配置。前端应填入base_url为http://localhost:6666/v1
+- Agent LLM：Gemini 2.5 Flash（后台工作）→ 在agent部分填入
+- 你需要两个不同的API密钥！
+
+🔗 数据流：用户 → DeepRolePlay → Agent LLM处理记忆 → 转发LLM生成回复
+
+# ====================================================================
+# 配置项详细说明
+# ====================================================================
+
+## 【proxy - API代理配置】转发到目标LLM服务
+
+### target_url
+- 说明：最终LLM服务地址
+- 作用：控制请求转发目标
+- 修改建议：需要修改，填入你的LLM服务API地址
+- 默认值："https://api.deepseek.com/v1"
+
+### api_key
+- 说明：API密钥
+- 作用：转发给目标LLM服务的API密钥
+- 修改建议：需要修改，填入你的目标服务API密钥，将覆盖请求头中的密钥
+- 默认值："Your-LLM-API-Key"
+
+### provider
+- 说明：服务提供商
+- 作用：可选，指定OpenRouter等聚合服务的具体提供商
+- 示例："novita/fp8"、"deepinfra/fp8"
+- 默认值：""（空字符串）
+
+### timeout
+- 说明：HTTP请求超时（秒）
+- 作用：控制请求等待时间
+- 修改建议：通常无需修改，30秒足够
+- 默认值：30
+
+### debug_mode
+- 说明：调试模式开关
+- 作用：控制是否跳过工作流直接返回测试消息
+- 修改建议：通常无需修改，正常运行时为false
+- 默认值：false
+
+### allow_extra_params
+- 说明：允许额外参数
+- 作用：控制是否允许转发额外的请求参数
+- 修改建议：通常无需修改
+- 默认值：false
+
+## 【scenario - 情景文件配置】角色状态存储
+
+### file_path
+- 说明：情景文件存储路径
+- 作用：控制角色状态保存位置
+- 修改建议：通常无需修改，自动创建目录
+- 默认值："./scenarios/scenario.json"
+
+### output_format
+- 说明：表格输出格式
+- 作用：控制表格数据输出格式
+- 选项："json"（JSON字符串）、"table"（格式化文本）
+- 修改建议：推荐使用"json"
+- 默认值："json"
+
+### clear_strategy
+- 说明：重复消息清理策略
+- 作用：控制何时清理重复消息
+- 选项："auto"（自动检测）、"always"（总是清理）、"manual"（手动清理）
+- 修改建议：推荐"auto"，自动检测到相似消息时清理，切卡时不再需要手动删除旧情景
+- 默认值："always"
+
+### similarity_threshold
+- 说明：消息相似度阈值
+- 作用：判断消息是否重复的相似度标准
+- 范围：0.0-1.0（0.9表示90%相似度）
+- 修改建议：通常无需修改，0.9对大多数场景合理
+- 默认值：0.9
+
+## 【langgraph - 工作流控制配置】Agent执行参数
+
+### max_history_length
+- 说明：传递给目标LLM的历史消息数量
+- 作用：控制上下文长度和token消耗
+- 修改建议：可调整，3-15条消息，影响记忆效果和成本
+- 默认值：7
+
+### last_ai_messages_index
+- 说明：最后AI消息索引
+- 作用：根据你预设不同选择使用哪条AI消息作为真实回复
+- 修改建议：通常无需修改，1表示最后一条AI消息，-1表示自动查找第一个内容长度>ai_message_min_length的AI消息的倒数索引
+- 默认值：-1
+
+### ai_message_min_length
+- 说明：AI消息最小长度阈值
+- 作用：当last_ai_messages_index=-1时用于自动查找AI消息
+- 修改建议：可调整，50-200，影响自动查找的准确性
+- 默认值：200
+
+### only_forward
+- 说明：快速转发模式
+- 作用：控制是否跳过Agent直接转发
+- 修改建议：通常无需修改，正常运行时为false
+- 默认值：false
+
+### stream_workflow_to_frontend
+- 说明：工作流前端流式开关
+- 作用：控制是否将agent推理过程推送到前端
+- 修改建议：可调整，true显示推理过程，false只显示最终对话
+- 默认值：true
+
+## 【agent - Agent配置】用于记忆闪回和情景更新的AI模型
+
+### model
+- 说明：AI模型名称
+- 作用：控制使用哪个AI模型
+- 修改建议：使用高性能模型如Qwen、Claude、Gemini等
+- 默认值："Qwen/Qwen3-235B-A22B-Instruct-2507"
+
+### temperature
+- 说明：生成随机性（0-1）
+- 作用：控制回答创造性
+- 修改建议：可调整，0稳定（推荐），0.1-0.3轻微随机，0.7有创意
+- 默认值：0
+
+### base_url
+- 说明：API服务提供商地址
+- 作用：控制模型调用接口
+- 修改建议：填入你的API服务商地址
+- 默认值："https://llm.chutes.ai/v1"
+
+### api_key
+- 说明：API访问密钥
+- 作用：控制服务认证
+- 修改建议：需要修改，填入你的API密钥
+- 默认值："Your-Agent-API-Key"
+
+### provider
+- 说明：服务提供商
+- 作用：可选，指定OpenRouter等聚合服务的具体提供商
+- 示例："novita/fp8"、"deepinfra/fp8"
+- 默认值：""（空字符串）
+
+### max_tokens
+- 说明：最大输出tokens
+- 作用：控制单次生成长度限制
+- 修改建议：通常无需修改，8192足够应对大多数情景
+- 默认值：8192
+
+### top_p
+- 说明：采样概率阈值（0-1）
+- 作用：控制词汇选择范围
+- 修改建议：通常无需修改，0.9确保多样性
+- 默认值：0.9
+
+### debug
+- 说明：Agent调试信息
+- 作用：控制是否显示详细执行过程
+- 修改建议：调试时修改，true显示过程，false正常运行
+- 默认值：false
+
+### max_iterations
+- 说明：最大执行轮数
+- 作用：控制上限防止无限循环
+- 修改建议：通常无需修改，40轮足够应对复杂任务
+- 默认值：40
+
+### stream_mode
+- 说明：Agent工作流流式模式
+- 作用：控制Agent执行时是否使用真流式
+- 修改建议：通常无需修改，true为真流式（astream），false为伪流式（ainvoke）
+- 默认值：true
+
+### workflow_mode
+- 说明：工作流执行模式
+- 作用：控制使用哪种工作流配置
+- 选项："fast"（经济快速模式）、"drp"（高性能模式）
+- 修改建议：推荐"fast"，成本控制更好
+- 默认值："fast"
+
+### timeout
+- 说明：单次请求超时（秒）
+- 作用：控制Agent调用等待时间
+- 修改建议：可调整，网络慢时可增加到180
+- 默认值：120
+
+### enable_wiki_search
+- 说明：启用维基百科搜索
+- 作用：控制记忆闪回时是否使用维基百科工具
+- 修改建议：通常无需修改，false节省成本和时间
+- 默认值：false
+
+### external_knowledge_path
+- 说明：外部知识库路径
+- 作用：指定额外的知识库文件路径
+- 修改建议：如有自定义知识库可配置
+- 默认值：""（空字符串）
+
+## 【server - 服务器配置】DeepRolePlay服务网络设置
+
+### host
+- 说明：监听IP地址
+- 作用：控制外部访问权限
+- 修改建议：通常无需修改，0.0.0.0允许局域网访问，127.0.0.1仅本机访问
+- 默认值："0.0.0.0"
+
+### port
+- 说明：服务端口号
+- 作用：控制前端连接端口
+- 修改建议：可调整，如被占用会自动+1，前端需相应修改
+- 默认值：6666
+
+### reload
+- 说明：代码热重载
+- 作用：控制开发时自动重启
+- 修改建议：开发时可设为true，生产环境false避免意外重启
+- 默认值：false
+
+## 【comfyui - ComfyUI配置】图片生成服务
+
+### enabled
+- 说明：功能启用开关
+- 作用：控制图片生成功能是否启用
+- 修改建议：需要图片生成时设为true
+- 默认值：false
+
+### comfy_url
+- 说明：ComfyUI服务器完整URL
+- 作用：连接到ComfyUI服务
+- 修改建议：填入你的ComfyUI服务器地址
+- 默认值："http://<Your-Comfyui-IP>:8188"
+
+### api_key
+- 说明：ComfyUI API密钥
+- 作用：ComfyUI服务认证
+- 修改建议：如ComfyUI需要认证则填入
+- 默认值："Your-Comfyu-Api-Key"
+
+### workflow_path
+- 说明：ComfyUI工作流文件路径
+- 作用：指定图片生成工作流配置
+- 修改建议：可自定义工作流JSON文件
+- 默认值："3rd/comfyui/wai.json"
+
+### positive_prompt_node_id
+- 说明：正向提示词节点ID
+- 作用：ComfyUI工作流中正向提示词节点的ID
+- 修改建议：根据工作流文件调整
+- 默认值："6"
+
+### latent_image_node_id
+- 说明：潜在图像节点ID
+- 作用：ComfyUI工作流中图像生成节点的ID
+- 修改建议：根据工作流文件调整
+- 默认值："5"
+
+### width
+- 说明：生成图片宽度
+- 作用：控制输出图片的像素宽度
+- 修改建议：根据需求调整，影响生成时间和质量
+- 默认值：960
+
+### height
+- 说明：生成图片高度
+- 作用：控制输出图片的像素高度
+- 修改建议：根据需求调整，影响生成时间和质量
+- 默认值：1024
+
+### num_images
+- 说明：每次生成图片数量
+- 作用：控制单次请求生成的图片数量
+- 修改建议：可调整，数量越多生成时间越长
+- 默认值：3
+
+### positive_prefix
+- 说明：正向提示词前缀
+- 作用：自动添加到所有图片生成提示词前的固定前缀
+- 修改建议：可自定义画风和质量关键词
+- 默认值："masterpiece,best quality,amazing quality,"
+
+### max_display_size
+- 说明：前端显示图片的最大边长（像素）
+- 作用：控制传输给SillyTavern的图片尺寸，影响传输速度和显示效果
+- 修改建议：根据网络情况调整，数值越小传输越快
+- 默认值：480
+
+## 【log - 日志配置】系统日志管理
+
+### base_log_path
+- 说明：日志文件基础路径
+- 作用：控制日志文件存储位置
+- 修改建议：通常无需修改，确保路径存在
+- 默认值："./logs"
+
+### enable_agent_history
+- 说明：启用Agent历史记录
+- 作用：控制是否保存Agent执行历史
+- 修改建议：调试时可启用，生产环境可关闭节省空间
+- 默认值：true
+
+### history_format
+- 说明：历史记录格式
+- 作用：控制Agent历史的保存格式
+- 选项："txt"（文本格式）、"json"（JSON格式）
+- 修改建议：推荐"txt"便于查看
+- 默认值："txt"
+
+### save_request_origin_messages
+- 说明：保存原始请求消息
+- 作用：控制是否保存未处理的原始请求消息
+- 修改建议：调试时启用，生产环境可关闭
+- 默认值：true
+
+# ====================================================================
+# 常见配置场景示例
+# ====================================================================
+
+## 💰 经济模式配置（推荐）
+```yaml
+proxy:
+  target_url: "https://api.deepseek.com/v1"  # 便宜的对话模型
+  api_key: "Your-DeepSeek-API-Key"
+
+agent:
+  model: "google/gemini-2.0-flash-exp"       # 快速的Agent模型
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "Your-OpenRouter-API-Key"
+  workflow_mode: "fast"                       # 经济模式
+
+langgraph:
+  max_history_length: 5                       # 减少token消耗
+  stream_workflow_to_frontend: false          # 隐藏推理过程
+```
+
+## 🚀 高性能模式配置
+```yaml
+proxy:
+  target_url: "https://api.openai.com/v1"     # 高质量对话模型
+  api_key: "Your-OpenAI-API-Key"
+
+agent:
+  model: "anthropic/claude-3.5-sonnet"       # 高性能Agent模型
+  base_url: "https://openrouter.ai/api/v1"
+  api_key: "Your-OpenRouter-API-Key"
+  workflow_mode: "drp"                        # 高性能模式
+
+langgraph:
+  max_history_length: 15                      # 更多上下文
+  stream_workflow_to_frontend: true           # 显示推理过程
+```
+
+## 🖼️ 图片生成模式配置
+```yaml
+comfyui:
+  enabled: true
+  comfy_url: "http://127.0.0.1:8188"
+  workflow_path: "3rd/comfyui/anime_workflow.json"  # 自定义工作流
+  num_images: 1                                       # 单张生成更快
+  width: 768
+  height: 768
+```
+
+# ====================================================================
+# 故障排除指南
+# ====================================================================
+
+## 🔧 常见问题和解决方案
+
+### 1. 端口被占用
+**现象**：启动时提示端口已被使用
+**解决**：系统会自动递增端口查找，检查终端输出中的实际端口号
+
+### 2. API密钥错误
+**现象**：401认证错误
+**解决**：检查proxy.api_key和agent.api_key是否正确填入
+
+### 3. 工作流执行超时
+**现象**：请求长时间无响应
+**解决**：
+- 增加agent.timeout值
+- 检查Agent模型的base_url是否可访问
+- 考虑切换到更快的Agent模型
+
+### 4. 图片生成失败
+**现象**：ComfyUI相关错误
+**解决**：
+- 检查comfyui.comfy_url是否正确
+- 确认ComfyUI服务正常运行
+- 验证workflow_path指向的文件是否存在
+
+### 5. 前端连接失败
+**现象**：SillyTavern无法连接
+**解决**：
+- 确认DeepRolePlay服务正常运行
+- 检查前端填入的base_url是否为 http://localhost:端口号/v1
+- 确认端口号与实际运行端口一致
+
+### 6. 记忆效果不佳
+**现象**：角色遗忘或记忆不准确
+**解决**：
+- 增加langgraph.max_history_length
+- 降低scenario.similarity_threshold
+- 考虑升级Agent模型性能
