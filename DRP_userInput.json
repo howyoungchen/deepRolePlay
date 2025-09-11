@@ -1,0 +1,17 @@
+{
+    "id": "6ff1f94b-b976-4c76-a41d-5066c5c2e633",
+    "scriptName": "DRP_current_user_input",
+    "findRegex": "/^(.*)$/s",
+    "replaceString": "<drp_current_user_input>$1</drp_current_user_input>",
+    "trimStrings": [],
+    "placement": [
+        1
+    ],
+    "disabled": false,
+    "markdownOnly": true,
+    "promptOnly": true,
+    "runOnEdit": false,
+    "substituteRegex": 0,
+    "minDepth": 0,
+    "maxDepth": 0
+}
